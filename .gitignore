@@ -1,0 +1,19 @@
+# Rust
+target/
+src-tauri/target/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+*.swp
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+.env.local
