@@ -1,9 +1,13 @@
 mod audio;
 mod commands;
+mod config;
+mod stt;
 
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use commands::{start_recording, stop_recording, toggle_recording, AppState};
+use commands::{
+    start_recording, stop_recording, stop_recording_and_transcribe, toggle_recording, AppState,
+};
 
 fn default_shortcut() -> Shortcut {
     Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space)
@@ -34,7 +38,11 @@ pub fn run() {
             app.global_shortcut().register(default_shortcut())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_recording, stop_recording])
+        .invoke_handler(tauri::generate_handler![
+            start_recording,
+            stop_recording,
+            stop_recording_and_transcribe
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

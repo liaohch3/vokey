@@ -3,9 +3,16 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import './App.css'
 
+type TranscriptionResult = {
+  wav_base64: string
+  text: string
+}
+
 function App() {
   const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [lastAudioBytes, setLastAudioBytes] = useState<number | null>(null)
+  const [transcribedText, setTranscribedText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -35,12 +42,16 @@ function App() {
 
   const stopRecording = async () => {
     setError(null)
+    setIsTranscribing(true)
     try {
-      const audioBase64 = await invoke<string>('stop_recording')
+      const result = await invoke<TranscriptionResult>('stop_recording_and_transcribe')
       setIsRecording(false)
-      setLastAudioBytes(Math.floor((audioBase64.length * 3) / 4))
+      setLastAudioBytes(Math.floor((result.wav_base64.length * 3) / 4))
+      setTranscribedText(result.text)
     } catch (err) {
       setError(String(err))
+    } finally {
+      setIsTranscribing(false)
     }
   }
 
@@ -53,14 +64,16 @@ function App() {
         <button type="button" onClick={startRecording} disabled={isRecording}>
           Start Recording
         </button>
-        <button type="button" onClick={stopRecording} disabled={!isRecording}>
-          Stop Recording
+        <button type="button" onClick={stopRecording} disabled={!isRecording || isTranscribing}>
+          {isTranscribing ? 'Transcribing...' : 'Stop Recording'}
         </button>
       </div>
 
       {isRecording && <div className="recording-overlay">Recording...</div>}
+      {isTranscribing && <p>Transcribing audio...</p>}
 
       {lastAudioBytes !== null && <p>Last recording size: {lastAudioBytes} bytes</p>}
+      {transcribedText && <p>Transcription: {transcribedText}</p>}
       {error && <p className="error">{error}</p>}
     </main>
   )

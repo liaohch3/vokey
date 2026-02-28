@@ -1,9 +1,12 @@
 use std::sync::mpsc;
 
 use base64::Engine;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
+use crate::config::load_or_create_config;
+use crate::stt::create_provider;
 
 enum AudioRequest {
     Start(mpsc::Sender<Result<(), AudioError>>),
@@ -12,6 +15,12 @@ enum AudioRequest {
 
 pub struct AppState {
     audio_tx: mpsc::Sender<AudioRequest>,
+}
+
+#[derive(Serialize)]
+pub struct TranscriptionResult {
+    wav_base64: String,
+    text: String,
 }
 
 impl AppState {
@@ -68,6 +77,26 @@ pub fn stop_recording(app: AppHandle, state: State<'_, AppState>) -> Result<Stri
         .map_err(|err| err.to_string())?;
 
     Ok(base64::engine::general_purpose::STANDARD.encode(wav))
+}
+
+#[tauri::command]
+pub fn stop_recording_and_transcribe(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<TranscriptionResult, String> {
+    let wav = state.stop_recording().map_err(|err| err.to_string())?;
+    app.emit("recording-state-changed", false)
+        .map_err(|err| err.to_string())?;
+
+    let config = load_or_create_config().map_err(|err| err.to_string())?;
+    let provider = create_provider(&config.stt).map_err(|err| err.to_string())?;
+    log::info!("transcribing audio with stt provider: {}", provider.name());
+    let text = provider.transcribe(&wav).map_err(|err| err.to_string())?;
+
+    Ok(TranscriptionResult {
+        wav_base64: base64::engine::general_purpose::STANDARD.encode(wav),
+        text,
+    })
 }
 
 pub fn toggle_recording(app: &AppHandle) {
