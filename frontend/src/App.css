@@ -29,3 +29,15 @@
 .error {
   color: #b00020;
 }
+
+.pipeline-status {
+  font-weight: 600;
+}
+
+.transcription-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: 28rem;
+}

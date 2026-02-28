@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod config;
+mod paste;
 mod stt;
 
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
