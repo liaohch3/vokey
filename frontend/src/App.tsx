@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import './App.css'
-import { LOCALES, t, useLocale } from './i18n'
+import { LOCALES, type Locale, t, useLocale } from './i18n'
 
 type Page = 'home' | 'history' | 'settings'
 
@@ -51,6 +51,7 @@ type AppConfig = {
 type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFailed'
 
 const HISTORY_KEY = 'vokey.history.v1'
+const APP_VERSION = 'v0.1.0'
 
 const defaultConfig = (): AppConfig => ({
   stt: {
@@ -111,10 +112,12 @@ const loadHistory = (): HistoryItem[] => {
     if (!raw) {
       return []
     }
+
     const parsed = JSON.parse(raw) as HistoryItem[]
     if (!Array.isArray(parsed)) {
       return []
     }
+
     return parsed
   } catch {
     return []
@@ -125,41 +128,122 @@ const saveHistory = (items: HistoryItem[]) => {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
 }
 
-const formatStage = (stage: string): string => {
-  switch (stage) {
-    case 'idle':
-      return t('status.idle')
-    case 'recording':
-      return t('status.recording')
-    case 'transcribing':
-      return t('status.transcribing')
-    case 'polishing':
-      return t('status.polishing')
-    case 'done':
-      return t('status.done')
-    case 'error':
-      return t('status.error')
+const getLocaleFlag = (code: Locale): string => {
+  switch (code) {
+    case 'en':
+      return '🇺🇸'
+    case 'zh-CN':
+      return '🇨🇳'
+    case 'zh-TW':
+      return '🇹🇼'
+    case 'ja':
+      return '🇯🇵'
+    case 'ko':
+      return '🇰🇷'
+    case 'fr':
+      return '🇫🇷'
+    case 'de':
+      return '🇩🇪'
+    case 'ar':
+      return '🇸🇦'
+    case 'ru':
+      return '🇷🇺'
+    case 'pt':
+      return '🇵🇹'
+    case 'es':
+      return '🇪🇸'
     default:
-      return stage
+      return '🌐'
   }
+}
+
+const formatRelativeTime = (timestamp: string, locale: Locale): string => {
+  const target = new Date(timestamp)
+  const now = new Date()
+  const diffMs = target.getTime() - now.getTime()
+  const absMinutes = Math.abs(Math.round(diffMs / 60000))
+
+  if (absMinutes < 60) {
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+    return rtf.format(Math.round(diffMs / 60000), 'minute')
+  }
+
+  const sameDay =
+    target.getFullYear() === now.getFullYear() &&
+    target.getMonth() === now.getMonth() &&
+    target.getDate() === now.getDate()
+
+  if (sameDay) {
+    return `Today ${target.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}`
+  }
+
+  return target.toLocaleString(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60)
+  const remainder = seconds % 60
+  return `${minutes}:${String(remainder).padStart(2, '0')}`
 }
 
 function App() {
   const { locale, setLocale } = useLocale()
   const [page, setPage] = useState<Page>('home')
+
   const [isRecording, setIsRecording] = useState(false)
   const [isWorking, setIsWorking] = useState(false)
   const [pipelineStage, setPipelineStage] = useState('idle')
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+
   const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null)
   const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
+
   const [config, setConfig] = useState<AppConfig>(defaultConfig)
   const [isLoadingConfig, setIsLoadingConfig] = useState(true)
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatusKey | null>(null)
+
+  const [showSttKey, setShowSttKey] = useState(false)
+  const [showLlmKey, setShowLlmKey] = useState(false)
+  const [copySuccessId, setCopySuccessId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [doneFlash, setDoneFlash] = useState(false)
+  const [micErrorShake, setMicErrorShake] = useState(false)
+  const [saveErrorShake, setSaveErrorShake] = useState(false)
 
   useEffect(() => {
     document.documentElement.lang = locale
   }, [locale])
+
+  useEffect(() => {
+    if (history.length > 0 && !lastResult) {
+      const latest = history[0]
+      setLastResult({
+        wav_base64: '',
+        raw_text: latest.rawText,
+        polished_text: latest.polishedText,
+      })
+    }
+  }, [history, lastResult])
+
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingSeconds(0)
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      setRecordingSeconds((value) => value + 1)
+    }, 1000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [isRecording])
 
   useEffect(() => {
     let mounted = true
@@ -188,8 +272,10 @@ function App() {
       if (!mounted) {
         return
       }
+
       setIsRecording(event.payload)
       if (event.payload) {
+        setPipelineStage('recording')
         setIsWorking(false)
       }
     })
@@ -201,6 +287,7 @@ function App() {
 
       const payload = event.payload
       setPipelineStage(payload.stage)
+
       if (payload.message) {
         setError(payload.message)
       }
@@ -209,9 +296,21 @@ function App() {
         setIsWorking(true)
       }
 
-      if (payload.stage === 'done' || payload.stage === 'error') {
+      if (payload.stage === 'done') {
         setIsWorking(false)
         setIsRecording(false)
+        setDoneFlash(true)
+        window.setTimeout(() => {
+          setDoneFlash(false)
+          setPipelineStage('idle')
+        }, 900)
+      }
+
+      if (payload.stage === 'error') {
+        setIsWorking(false)
+        setIsRecording(false)
+        setMicErrorShake(true)
+        window.setTimeout(() => setMicErrorShake(false), 400)
       }
     })
 
@@ -233,14 +332,22 @@ function App() {
     }, 0)
   }, [history])
 
+  const timeSavedMinutes = useMemo(() => {
+    return Math.max(1, Math.round(totalWords / 40))
+  }, [totalWords])
+
   const startRecording = async () => {
     setError(null)
+    setDoneFlash(false)
     try {
       await invoke('start_recording')
       setPipelineStage('recording')
       setIsRecording(true)
     } catch (err) {
+      setPipelineStage('error')
+      setMicErrorShake(true)
       setError(String(err))
+      window.setTimeout(() => setMicErrorShake(false), 400)
     }
   }
 
@@ -253,7 +360,6 @@ function App() {
     try {
       const result = await invoke<TranscriptionResult>('stop_recording_and_transcribe')
       setLastResult(result)
-      setPipelineStage('done')
 
       const nextItem: HistoryItem = {
         id: `${Date.now()}`,
@@ -261,12 +367,22 @@ function App() {
         rawText: result.raw_text,
         polishedText: result.polished_text,
       }
+
       const nextHistory = [nextItem, ...history].slice(0, 100)
       setHistory(nextHistory)
       saveHistory(nextHistory)
+
+      setPipelineStage('done')
+      setDoneFlash(true)
+      window.setTimeout(() => {
+        setDoneFlash(false)
+        setPipelineStage('idle')
+      }, 900)
     } catch (err) {
       setPipelineStage('error')
+      setMicErrorShake(true)
       setError(String(err))
+      window.setTimeout(() => setMicErrorShake(false), 400)
     } finally {
       setIsRecording(false)
       setIsWorking(false)
@@ -282,325 +398,325 @@ function App() {
       setSettingsStatus('settings.saved')
     } catch (err) {
       setSettingsStatus('settings.saveFailed')
+      setSaveErrorShake(true)
+      window.setTimeout(() => setSaveErrorShake(false), 400)
       setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
     }
   }
 
+  const clearHistory = () => {
+    setHistory([])
+    setLastResult(null)
+    saveHistory([])
+  }
+
+  const copyHistoryText = async (id: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopySuccessId(id)
+      window.setTimeout(() => setCopySuccessId(null), 1200)
+    } catch {
+      setError(t('status.error'))
+    }
+  }
+
+  const heroTitle = (() => {
+    if (pipelineStage === 'recording') {
+      return 'Recording...'
+    }
+    if (pipelineStage === 'transcribing') {
+      return 'Transcribing...'
+    }
+    if (pipelineStage === 'polishing') {
+      return 'Polishing...'
+    }
+    return t('home.readyToDictate')
+  })()
+
+  const heroSubtext = pipelineStage === 'recording' ? formatDuration(recordingSeconds) : t('home.pressHotkey')
+
+  const selectedLocale = LOCALES.find((entry) => entry.code === locale) ?? LOCALES[0]
+
   return (
-    <div className="app-layout" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="app-shell" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">OT</div>
+          <div className="brand-mark">V</div>
           <div>
             <p className="brand-title">{t('app.title')}</p>
             <p className="brand-subtitle">{t('app.subtitle')}</p>
           </div>
         </div>
 
-        <nav className="nav">
+        <nav className="nav-list">
           <button type="button" className={`nav-item ${page === 'home' ? 'active' : ''}`} onClick={() => setPage('home')}>
-            <span>🏠</span>
+            <span className="nav-icon" aria-hidden="true">
+              🏠
+            </span>
             <span>{t('nav.home')}</span>
           </button>
           <button type="button" className={`nav-item ${page === 'history' ? 'active' : ''}`} onClick={() => setPage('history')}>
-            <span>🕘</span>
+            <span className="nav-icon" aria-hidden="true">
+              📋
+            </span>
             <span>{t('nav.history')}</span>
           </button>
-          <button
-            type="button"
-            className={`nav-item ${page === 'settings' ? 'active' : ''}`}
-            onClick={() => setPage('settings')}
-          >
-            <span>⚙️</span>
+          <button type="button" className={`nav-item ${page === 'settings' ? 'active' : ''}`} onClick={() => setPage('settings')}>
+            <span className="nav-icon" aria-hidden="true">
+              ⚙️
+            </span>
             <span>{t('nav.settings')}</span>
           </button>
         </nav>
+
+        <div className="sidebar-bottom">
+          <label className="locale-select-wrap">
+            <span className="caption">{t('settings.uiLanguage')}</span>
+            <div className="locale-select-row">
+              <span className="locale-flag" aria-hidden="true">
+                {getLocaleFlag(selectedLocale.code)}
+              </span>
+              <select
+                value={locale}
+                onChange={(event) => setLocale(event.target.value as Locale)}
+                className="locale-select"
+                aria-label={t('settings.uiLanguage')}
+              >
+                {LOCALES.map((entry) => (
+                  <option key={entry.code} value={entry.code}>
+                    {entry.nativeName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </label>
+          <p className="version">{APP_VERSION}</p>
+        </div>
       </aside>
 
-      <main className="content">
-        {isRecording && (
-          <div className="recording-overlay">
-            <span className="recording-dot" />
-            {t('overlay.recording')}
-          </div>
-        )}
-
+      <main className="content-area">
         {page === 'home' && (
-          <section className="page">
-            <header className="hero">
-              <h1>{t('home.title')}</h1>
-              <p>{t('home.tagline')}</p>
-            </header>
-
-            <div className="card recorder-card">
-              <button
-                type="button"
-                className={`record-button ${isRecording ? 'recording' : ''}`}
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isWorking}
-              >
-                <span className="mic-icon">🎤</span>
-              </button>
-              <p className="record-hint">{isRecording ? t('home.clickToStop') : t('home.clickToStart')}</p>
-
-              <div className="pipeline-track">
-                {['idle', 'recording', 'transcribing', 'polishing', 'done'].map((stage) => (
-                  <div
-                    key={stage}
-                    className={`pipeline-step ${pipelineStage === stage ? 'active' : ''}`}
-                  >
-                    {formatStage(stage)}
-                  </div>
-                ))}
+          <section className="page page-enter">
+            <article className="card hero-card">
+              <div className="hero-copy">
+                <h1>{heroTitle}</h1>
+                <p>{heroSubtext}</p>
               </div>
+
+              <div className="mic-block">
+                <button
+                  type="button"
+                  className={`mic-button ${pipelineStage} ${doneFlash ? 'done' : ''} ${micErrorShake ? 'shake' : ''}`}
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isWorking && !isRecording}
+                  aria-label={isRecording ? t('home.clickToStop') : t('home.clickToStart')}
+                >
+                  {pipelineStage === 'transcribing' || pipelineStage === 'polishing' ? (
+                    <span className="loader-ring" aria-hidden="true" />
+                  ) : doneFlash ? (
+                    <span className="done-mark" aria-hidden="true">
+                      ✓
+                    </span>
+                  ) : (
+                    <span className="mic-glyph" aria-hidden="true">
+                      🎤
+                    </span>
+                  )}
+                  {pipelineStage === 'recording' && (
+                    <>
+                      <span className="pulse-ring" aria-hidden="true" />
+                      <span className="pulse-ring second" aria-hidden="true" />
+                    </>
+                  )}
+                </button>
+
+                <p className="status-note">
+                  {pipelineStage === 'recording' && `${t('status.recording')} ${formatDuration(recordingSeconds)}`}
+                  {pipelineStage === 'transcribing' && `${t('status.transcribing')}...`}
+                  {pipelineStage === 'polishing' && `${t('status.polishing')}...`}
+                  {pipelineStage === 'idle' && t('home.readyToDictate')}
+                  {pipelineStage === 'done' && `${t('status.done')}!`}
+                  {pipelineStage === 'error' && `${t('status.error')}`}
+                </p>
+                {error && <p className="inline-error">{error}</p>}
+              </div>
+            </article>
+
+            <div className="stats-grid">
+              <article className="card stat-card">
+                <p className="stat-icon" aria-hidden="true">
+                  📝
+                </p>
+                <p className="stat-value">{history.length}</p>
+                <p className="stat-label">{t('home.totalDictations').toLowerCase()}</p>
+              </article>
+              <article className="card stat-card">
+                <p className="stat-icon" aria-hidden="true">
+                  💬
+                </p>
+                <p className="stat-value">{totalWords}</p>
+                <p className="stat-label">{t('home.totalWords').toLowerCase()}</p>
+              </article>
+              <article className="card stat-card">
+                <p className="stat-icon" aria-hidden="true">
+                  ⏱️
+                </p>
+                <p className="stat-value">{timeSavedMinutes}m</p>
+                <p className="stat-label">{t('home.timeSaved').toLowerCase()}</p>
+              </article>
             </div>
 
-            <div className="grid-2">
-              <article className="card stats-card">
-                <h2>{t('home.stats')}</h2>
-                <div className="stat-row">
-                  <span>{t('home.totalDictations')}</span>
-                  <strong>{history.length}</strong>
-                </div>
-                <div className="stat-row">
-                  <span>{t('home.totalWords')}</span>
-                  <strong>{totalWords}</strong>
-                </div>
-              </article>
+            <article className="card latest-card">
+              <div className="latest-header">
+                <h2>{t('home.latest')}</h2>
+                <p>{history[0] ? formatRelativeTime(history[0].timestamp, locale) : '--'}</p>
+              </div>
 
-              <article className="card result-card">
-                <h2>{t('home.lastTranscription')}</h2>
-                {!lastResult && <p className="muted">{t('home.noTranscriptionYet')}</p>}
-                {lastResult && (
-                  <div className="result-fields">
-                    <div>
-                      <p className="field-label">{t('home.raw')}</p>
-                      <p>{lastResult.raw_text}</p>
-                    </div>
-                    <div>
-                      <p className="field-label">{t('home.polished')}</p>
-                      <p>{lastResult.polished_text}</p>
-                    </div>
+              {!lastResult && (
+                <div className="empty-state">
+                  <p className="empty-emoji" aria-hidden="true">
+                    ✨
+                  </p>
+                  <p>{t('home.emptyState')}</p>
+                </div>
+              )}
+
+              {lastResult && (
+                <div className="latest-content">
+                  <div className="latest-panel original">
+                    <p className="panel-title">{t('home.original')}</p>
+                    <p>{lastResult.raw_text}</p>
                   </div>
-                )}
-              </article>
-            </div>
+                  <div className="latest-panel polished">
+                    <p className="panel-title">{t('home.polished')}</p>
+                    <p>{lastResult.polished_text}</p>
+                  </div>
+                </div>
+              )}
+            </article>
           </section>
         )}
 
         {page === 'history' && (
-          <section className="page">
-            <header className="page-header">
-              <h1>{t('history.title')}</h1>
-              <p>{t('history.subtitle')}</p>
+          <section className="page page-enter">
+            <header className="page-header split">
+              <div>
+                <h1>{t('history.title')}</h1>
+                <p>{t('history.subtitle')}</p>
+              </div>
+              <button type="button" className="danger-text" onClick={clearHistory} disabled={history.length === 0}>
+                {t('history.clearAll')}
+              </button>
             </header>
 
-            <div className="history-list">
-              {history.length === 0 && <p className="card muted">{t('history.empty')}</p>}
-              {history.map((entry) => (
-                <article key={entry.id} className="card history-item">
-                  <p className="history-time">{new Date(entry.timestamp).toLocaleString(locale)}</p>
-                  <p>
-                    <span className="field-label">{t('history.rawLabel')}</span> {entry.rawText}
-                  </p>
-                  <p>
-                    <span className="field-label">{t('history.polishedLabel')}</span> {entry.polishedText}
-                  </p>
-                </article>
-              ))}
-            </div>
+            {history.length === 0 && (
+              <div className="card empty-state history-empty">
+                <p className="empty-emoji" aria-hidden="true">
+                  🗂️
+                </p>
+                <p>{t('history.empty')}</p>
+              </div>
+            )}
+
+            {history.length > 0 && (
+              <div className="history-list">
+                {history.map((entry) => (
+                  <article key={entry.id} className="card history-item">
+                    <div className="history-head">
+                      <p className="history-time">{formatRelativeTime(entry.timestamp, locale)}</p>
+                      <button
+                        type="button"
+                        className="text-button copy-btn"
+                        onClick={() => copyHistoryText(entry.id, entry.polishedText)}
+                      >
+                        {copySuccessId === entry.id ? t('history.copySuccess') : '⧉'}
+                      </button>
+                    </div>
+                    <p className="history-raw">{entry.rawText}</p>
+                    <p className="history-polished">{entry.polishedText}</p>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
         {page === 'settings' && (
-          <section className="page">
+          <section className="page page-enter">
             <header className="page-header">
               <h1>{t('settings.title')}</h1>
               <p>{t('settings.subtitle')}</p>
             </header>
 
-            <div className="card settings-form">
-              <label>
-                <span>{t('settings.uiLanguage')}</span>
-                <select value={locale} onChange={(event) => setLocale(event.target.value as (typeof LOCALES)[number]['code'])}>
-                  {LOCALES.map((item) => (
-                    <option key={item.code} value={item.code}>
-                      {item.nativeName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="settings-grid">
+              <article className="card section-card">
+                <h2>{t('settings.general')}</h2>
+                <div className="field-row">
+                  <label>{t('settings.shortcut')}</label>
+                  <span className="badge">{t('settings.shortcutValue')}</span>
+                </div>
+              </article>
 
-              <label>
-                <span>{t('settings.shortcut')}</span>
-                <input value={t('settings.shortcutValue')} disabled />
-              </label>
+              <article className="card section-card">
+                <h2>{t('settings.stt')}</h2>
+                <div className="field-stack">
+                  <div className="field-group">
+                    <label>{t('settings.sttProvider')}</label>
+                    <div className="segmented" role="group" aria-label={t('settings.sttProvider')}>
+                      <button
+                        type="button"
+                        className={config.stt.provider === 'groq' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'groq' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.sttProviderGroq')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.stt.provider === 'mock' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'mock' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.sttProviderMock')}
+                      </button>
+                    </div>
+                  </div>
 
-              <label>
-                <span>{t('settings.primaryLanguage')}</span>
-                <select
-                  value={config.stt.groq.language ?? 'auto'}
-                  onChange={(event) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      stt: {
-                        ...prev.stt,
-                        groq: {
-                          ...prev.stt.groq,
-                          language: event.target.value === 'auto' ? null : event.target.value,
-                        },
-                      },
-                    }))
-                  }
-                  disabled={isLoadingConfig}
-                >
-                  <option value="auto">{t('settings.languageAuto')}</option>
-                  <option value="en">{t('settings.languageEnglish')}</option>
-                  <option value="zh">{t('settings.languageChinese')}</option>
-                  <option value="ja">{t('settings.languageJapanese')}</option>
-                </select>
-              </label>
+                  <div className="field-group">
+                    <label>{t('settings.sttApiKey')}</label>
+                    <div className="input-with-action">
+                      <input
+                        type={showSttKey ? 'text' : 'password'}
+                        value={config.stt.api_key}
+                        onChange={(event) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            stt: {
+                              ...prev.stt,
+                              api_key: event.target.value,
+                            },
+                          }))
+                        }
+                        placeholder={t('settings.sttApiKeyPlaceholder')}
+                        disabled={isLoadingConfig}
+                      />
+                      <button type="button" className="text-button" onClick={() => setShowSttKey((value) => !value)}>
+                        {showSttKey ? t('settings.hideKey') : t('settings.showKey')}
+                      </button>
+                    </div>
+                  </div>
 
-              <label>
-                <span>{t('settings.sttProvider')}</span>
-                <select
-                  value={config.stt.provider}
-                  onChange={(event) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      stt: {
-                        ...prev.stt,
-                        provider: event.target.value as AppConfig['stt']['provider'],
-                      },
-                    }))
-                  }
-                  disabled={isLoadingConfig}
-                >
-                  <option value="groq">{t('settings.sttProviderGroq')}</option>
-                  <option value="mock">{t('settings.sttProviderMock')}</option>
-                </select>
-              </label>
-
-              <label>
-                <span>{t('settings.sttApiKey')}</span>
-                <input
-                  type="password"
-                  value={config.stt.api_key}
-                  onChange={(event) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      stt: {
-                        ...prev.stt,
-                        api_key: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder={t('settings.sttApiKeyPlaceholder')}
-                  disabled={isLoadingConfig}
-                />
-              </label>
-
-              {config.stt.provider === 'groq' && (
-                <label>
-                  <span>{t('settings.sttModel')}</span>
-                  <input
-                    value={config.stt.groq.model}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        stt: {
-                          ...prev.stt,
-                          groq: {
-                            ...prev.stt.groq,
-                            model: event.target.value,
-                          },
-                        },
-                      }))
-                    }
-                    disabled={isLoadingConfig}
-                  />
-                </label>
-              )}
-
-              <hr />
-
-              <label>
-                <span>{t('settings.llmProvider')}</span>
-                <select
-                  value={config.llm.provider}
-                  onChange={(event) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      llm: {
-                        ...prev.llm,
-                        provider: event.target.value as AppConfig['llm']['provider'],
-                      },
-                    }))
-                  }
-                  disabled={isLoadingConfig}
-                >
-                  <option value="gemini">{t('settings.llmProviderGemini')}</option>
-                  <option value="openai">{t('settings.llmProviderOpenAiCompatible')}</option>
-                  <option value="none">{t('settings.llmProviderNone')}</option>
-                </select>
-              </label>
-
-              {config.llm.provider !== 'none' && (
-                <label>
-                  <span>{t('settings.llmApiKey')}</span>
-                  <input
-                    type="password"
-                    value={config.llm.api_key}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        llm: {
-                          ...prev.llm,
-                          api_key: event.target.value,
-                        },
-                      }))
-                    }
-                    placeholder={t('settings.llmApiKeyPlaceholder')}
-                    disabled={isLoadingConfig}
-                  />
-                </label>
-              )}
-
-              {config.llm.provider === 'gemini' && (
-                <label>
-                  <span>{t('settings.geminiModel')}</span>
-                  <input
-                    value={config.llm.gemini.model}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        llm: {
-                          ...prev.llm,
-                          gemini: {
-                            ...prev.llm.gemini,
-                            model: event.target.value,
-                          },
-                        },
-                      }))
-                    }
-                    disabled={isLoadingConfig}
-                  />
-                </label>
-              )}
-
-              {config.llm.provider === 'openai' && (
-                <>
-                  <label>
-                    <span>{t('settings.llmModel')}</span>
+                  <div className="field-group">
+                    <label>{t('settings.sttModel')}</label>
                     <input
-                      value={config.llm.openai.model}
+                      value={config.stt.groq.model}
                       onChange={(event) =>
                         setConfig((prev) => ({
                           ...prev,
-                          llm: {
-                            ...prev.llm,
-                            openai: {
-                              ...prev.llm.openai,
+                          stt: {
+                            ...prev.stt,
+                            groq: {
+                              ...prev.stt.groq,
                               model: event.target.value,
                             },
                           },
@@ -608,58 +724,219 @@ function App() {
                       }
                       disabled={isLoadingConfig}
                     />
-                  </label>
+                  </div>
 
-                  <label>
-                    <span>{t('settings.llmBaseUrl')}</span>
-                    <input
-                      value={config.llm.openai.base_url}
+                  <div className="field-group">
+                    <label>{t('settings.primaryLanguage')}</label>
+                    <select
+                      value={config.stt.groq.language ?? 'auto'}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          stt: {
+                            ...prev.stt,
+                            groq: {
+                              ...prev.stt.groq,
+                              language: event.target.value === 'auto' ? null : event.target.value,
+                            },
+                          },
+                        }))
+                      }
+                      disabled={isLoadingConfig}
+                    >
+                      <option value="auto">{t('settings.languageAuto')}</option>
+                      <option value="zh">{t('settings.languageChinese')}</option>
+                      <option value="en">{t('settings.languageEnglish')}</option>
+                      <option value="ja">{t('settings.languageJapanese')}</option>
+                    </select>
+                  </div>
+                </div>
+              </article>
+
+              <article className="card section-card">
+                <h2>{t('settings.aiPolish')}</h2>
+                <div className="field-stack">
+                  <div className="field-group">
+                    <label>{t('settings.llmProvider')}</label>
+                    <div className="segmented" role="group" aria-label={t('settings.llmProvider')}>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'gemini' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'gemini' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderGemini')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'openai' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'openai' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderOpenAiCompatible')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'none' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'none' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderNone')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {config.llm.provider !== 'none' && (
+                    <div className="field-group">
+                      <label>{t('settings.llmApiKey')}</label>
+                      <div className="input-with-action">
+                        <input
+                          type={showLlmKey ? 'text' : 'password'}
+                          value={config.llm.api_key}
+                          onChange={(event) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              llm: {
+                                ...prev.llm,
+                                api_key: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder={t('settings.llmApiKeyPlaceholder')}
+                          disabled={isLoadingConfig}
+                        />
+                        <button type="button" className="text-button" onClick={() => setShowLlmKey((value) => !value)}>
+                          {showLlmKey ? t('settings.hideKey') : t('settings.showKey')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {config.llm.provider === 'gemini' && (
+                    <div className="field-group">
+                      <label>{t('settings.geminiModel')}</label>
+                      <input
+                        value={config.llm.gemini.model}
+                        onChange={(event) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            llm: {
+                              ...prev.llm,
+                              gemini: {
+                                ...prev.llm.gemini,
+                                model: event.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        disabled={isLoadingConfig}
+                      />
+                    </div>
+                  )}
+
+                  {config.llm.provider === 'openai' && (
+                    <>
+                      <div className="field-group">
+                        <label>{t('settings.llmModel')}</label>
+                        <input
+                          value={config.llm.openai.model}
+                          onChange={(event) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              llm: {
+                                ...prev.llm,
+                                openai: {
+                                  ...prev.llm.openai,
+                                  model: event.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          disabled={isLoadingConfig}
+                        />
+                      </div>
+
+                      <div className="field-group">
+                        <label>{t('settings.llmBaseUrl')}</label>
+                        <input
+                          value={config.llm.openai.base_url}
+                          onChange={(event) =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              llm: {
+                                ...prev.llm,
+                                openai: {
+                                  ...prev.llm.openai,
+                                  base_url: event.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          placeholder={t('settings.llmBaseUrlPlaceholder')}
+                          disabled={isLoadingConfig}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="field-group">
+                    <label>{t('settings.systemPrompt')}</label>
+                    <textarea
+                      rows={5}
+                      value={config.llm.system_prompt}
                       onChange={(event) =>
                         setConfig((prev) => ({
                           ...prev,
                           llm: {
                             ...prev.llm,
-                            openai: {
-                              ...prev.llm.openai,
-                              base_url: event.target.value,
-                            },
+                            system_prompt: event.target.value,
                           },
                         }))
                       }
-                      placeholder={t('settings.llmBaseUrlPlaceholder')}
                       disabled={isLoadingConfig}
                     />
-                  </label>
-                </>
-              )}
+                    <p className="caption">{config.llm.system_prompt.length} chars</p>
+                  </div>
+                </div>
+              </article>
 
-              <label>
-                <span>{t('settings.systemPrompt')}</span>
-                <textarea
-                  rows={6}
-                  value={config.llm.system_prompt}
-                  onChange={(event) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      llm: {
-                        ...prev.llm,
-                        system_prompt: event.target.value,
-                      },
-                    }))
-                  }
-                  disabled={isLoadingConfig}
-                />
-              </label>
+              <article className="card section-card">
+                <h2>{t('settings.about')}</h2>
+                <div className="about-list">
+                  <p>
+                    <span>{t('settings.version')}</span>
+                    <strong>{APP_VERSION}</strong>
+                  </p>
+                  <p>
+                    <span>{t('settings.github')}</span>
+                    <a href="https://github.com/liaohch3/vokey" target="_blank" rel="noreferrer">
+                      github.com/liaohch3/vokey
+                    </a>
+                  </p>
+                  <p>
+                    <span>{t('settings.license')}</span>
+                    <strong>MIT</strong>
+                  </p>
+                </div>
+              </article>
 
-              <button type="button" className="primary" onClick={saveSettings} disabled={isLoadingConfig}>
-                {t('settings.save')}
+              <button
+                type="button"
+                className={`primary-save ${settingsStatus === 'settings.saved' ? 'saved' : ''} ${
+                  saveErrorShake ? 'shake' : ''
+                }`}
+                onClick={saveSettings}
+                disabled={isLoadingConfig}
+              >
+                <span>{t('settings.save')}</span>
+                {settingsStatus === 'settings.saved' && <span className="save-check">✓</span>}
               </button>
-              {settingsStatus && <p className="muted">{t(settingsStatus)}</p>}
             </div>
+
+            {settingsStatus && <p className="settings-feedback">{t(settingsStatus)}</p>}
+            {error && <p className="inline-error">{error}</p>}
           </section>
         )}
-
-        {error && <p className="error-banner">{error}</p>}
       </main>
     </div>
   )
