@@ -286,3 +286,20 @@ mod tests {
         assert_eq!(bits_per_sample, 16);
     }
 }
+
+/// Request microphone permission on macOS.
+/// Must be called before any cpal operations.
+#[cfg(target_os = "macos")]
+pub fn request_microphone_permission() {
+    use std::process::Command;
+    // Use a tiny Swift snippet via osascript to trigger the permission dialog
+    let _ = Command::new("osascript")
+        .args([
+            "-e",
+            r#"do shell script "swift -e 'import AVFoundation; AVCaptureDevice.requestAccess(for: .audio) { _ in }; Thread.sleep(forTimeInterval: 1)'"#,
+        ])
+        .output();
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn request_microphone_permission() {}
