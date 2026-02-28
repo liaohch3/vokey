@@ -1,13 +1,13 @@
 import type { Translations } from './en'
 
 export const zhTW: Translations = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': '自帶金鑰聽寫',
   'nav.home': '首頁',
   'nav.history': '歷史',
   'nav.settings': '設定',
   'overlay.recording': '錄音中...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': '語音轉文字，照你的方式',
   'home.clickToStart': '點擊開始',
   'home.clickToStop': '點擊停止',

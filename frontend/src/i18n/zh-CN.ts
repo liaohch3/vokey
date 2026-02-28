@@ -1,13 +1,13 @@
 import type { Translations } from './en'
 
 export const zhCN: Translations = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': '自带密钥听写',
   'nav.home': '首页',
   'nav.history': '历史',
   'nav.settings': '设置',
   'overlay.recording': '录音中...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': '语音转文字，按你的方式',
   'home.clickToStart': '点击开始',
   'home.clickToStop': '点击停止',

@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>OpenTypeless needs microphone access to record your voice for speech-to-text transcription.</string>
+    <string>Vokey needs microphone access to record your voice for speech-to-text transcription.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>OpenTypeless needs accessibility access to paste transcribed text at your cursor position.</string>
+    <string>Vokey needs accessibility access to paste transcribed text at your cursor position.</string>
 </dict>
 </plist>

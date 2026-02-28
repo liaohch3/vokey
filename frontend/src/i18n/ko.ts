@@ -1,13 +1,13 @@
 import type { Translations } from './en'
 
 export const ko: Translations = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': 'BYOK 받아쓰기',
   'nav.home': '홈',
   'nav.history': '기록',
   'nav.settings': '설정',
   'overlay.recording': '녹음 중...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': '음성을 텍스트로, 원하는 방식대로',
   'home.clickToStart': '클릭하여 시작',
   'home.clickToStop': '클릭하여 중지',

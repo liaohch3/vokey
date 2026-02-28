@@ -50,7 +50,7 @@ type AppConfig = {
 
 type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFailed'
 
-const HISTORY_KEY = 'opentypeless.history.v1'
+const HISTORY_KEY = 'vokey.history.v1'
 
 const defaultConfig = (): AppConfig => ({
   stt: {

@@ -11,7 +11,7 @@ import { zhTW } from './zh-TW'
 import { pt } from './pt'
 import { es } from './es'
 
-const STORAGE_KEY = 'opentypeless.locale'
+const STORAGE_KEY = 'vokey.locale'
 
 export const LOCALES = [
   { code: 'en', nativeName: 'English' },

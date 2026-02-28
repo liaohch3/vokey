@@ -1,4 +1,4 @@
-# OpenTypeless — Agent Instructions
+# Vokey — Agent Instructions
 
 ## Project Identity
 
@@ -158,7 +158,7 @@ Implementations:
 
 ### Config
 
-TOML file at `~/.opentypeless/config.toml`:
+TOML file at `~/.vokey/config.toml`:
 
 ```toml
 [hotkey]
@@ -188,12 +188,12 @@ code = "Convert to code comments or variable names"
 ## Worktree Workflow
 
 ```bash
-git worktree add -b feat/<name> /tmp/opentypeless-<name> main
-cd /tmp/opentypeless-<name>
+git worktree add -b feat/<name> /tmp/vokey-<name> main
+cd /tmp/vokey-<name>
 # develop and test
-cd /path/to/opentypeless
+cd /path/to/vokey
 git merge --ff-only feat/<name>
-git worktree remove /tmp/opentypeless-<name>
+git worktree remove /tmp/vokey-<name>
 git branch -d feat/<name>
 ```
 

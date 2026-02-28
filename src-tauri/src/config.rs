@@ -176,5 +176,5 @@ pub fn save_config(config: &AppConfig) -> Result<(), ConfigError> {
 
 pub fn config_path() -> Result<PathBuf, ConfigError> {
     let home = dirs::home_dir().ok_or(ConfigError::HomeDirNotFound)?;
-    Ok(home.join(".opentypeless").join("config.toml"))
+    Ok(home.join(".vokey").join("config.toml"))
 }

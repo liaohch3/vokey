@@ -1,13 +1,13 @@
 import type { Translations } from './en'
 
 export const ja: Translations = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': 'BYOKディクテーション',
   'nav.home': 'ホーム',
   'nav.history': '履歴',
   'nav.settings': '設定',
   'overlay.recording': '録音中...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': '音声をテキストへ、あなたのやり方で',
   'home.clickToStart': 'クリックして開始',
   'home.clickToStop': 'クリックして停止',

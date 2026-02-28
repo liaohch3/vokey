@@ -1,4 +1,4 @@
-# OpenTypeless
+# Vokey
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -6,7 +6,7 @@ Open-source, BYOK voice dictation. Speak naturally, get polished text — using 
 
 ## Why
 
-Voice dictation apps either cost $12+/month or ship your audio to someone else's cloud. OpenTypeless lets you bring your own keys and choose your own providers. No accounts, no subscriptions, no vendor lock-in.
+Voice dictation apps either cost $12+/month or ship your audio to someone else's cloud. Vokey lets you bring your own keys and choose your own providers. No accounts, no subscriptions, no vendor lock-in.
 
 ## How It Works
 
@@ -61,8 +61,8 @@ Press hotkey → Speak → Release → Polished text appears at cursor
 
 ### Setup
 ```bash
-git clone https://github.com/liaohch3/opentypeless.git
-cd opentypeless
+git clone https://github.com/liaohch3/vokey.git
+cd vokey
 npm install
 cargo tauri dev
 ```

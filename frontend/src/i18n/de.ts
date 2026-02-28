@@ -1,13 +1,13 @@
 import type { Translations } from './en'
 
 export const de: Translations = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': 'BYOK-Diktat',
   'nav.home': 'Start',
   'nav.history': 'Verlauf',
   'nav.settings': 'Einstellungen',
   'overlay.recording': 'Aufnahme läuft...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': 'Sprache zu Text, auf deine Art',
   'home.clickToStart': 'Klicken zum Starten',
   'home.clickToStop': 'Klicken zum Stoppen',

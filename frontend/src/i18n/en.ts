@@ -1,11 +1,11 @@
 export const en = {
-  'app.title': 'OpenTypeless',
+  'app.title': 'Vokey',
   'app.subtitle': 'BYOK dictation',
   'nav.home': 'Home',
   'nav.history': 'History',
   'nav.settings': 'Settings',
   'overlay.recording': 'Recording...',
-  'home.title': 'OpenTypeless',
+  'home.title': 'Vokey',
   'home.tagline': 'Voice to text, your way',
   'home.clickToStart': 'Click to start',
   'home.clickToStop': 'Click to stop',
