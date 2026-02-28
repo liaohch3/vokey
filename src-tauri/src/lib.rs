@@ -1,6 +1,27 @@
+mod audio;
+mod commands;
+
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+use commands::{start_recording, stop_recording, toggle_recording, AppState};
+
+fn default_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(AppState::new())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(move |app, shortcut, event| {
+                    if shortcut == &default_shortcut() && event.state() == ShortcutState::Pressed {
+                        toggle_recording(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -9,8 +30,11 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            app.global_shortcut().register(default_shortcut())?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![start_recording, stop_recording])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
