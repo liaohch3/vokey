@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import './App.css'
+import { LOCALES, t, useLocale } from './i18n'
 
 type Page = 'home' | 'history' | 'settings'
 
@@ -47,6 +48,8 @@ type AppConfig = {
   }
 }
 
+type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFailed'
+
 const HISTORY_KEY = 'opentypeless.history.v1'
 
 const defaultConfig = (): AppConfig => ({
@@ -61,8 +64,7 @@ const defaultConfig = (): AppConfig => ({
   llm: {
     provider: 'none',
     api_key: '',
-    system_prompt:
-      'You are a dictation assistant. Clean up the following speech-to-text transcription: fix grammar, remove filler words, improve punctuation. Keep the original meaning and language. Return only the polished text, no explanation.',
+    system_prompt: t('settings.defaultSystemPrompt'),
     gemini: {
       model: 'gemini-2.0-flash',
     },
@@ -126,23 +128,24 @@ const saveHistory = (items: HistoryItem[]) => {
 const formatStage = (stage: string): string => {
   switch (stage) {
     case 'idle':
-      return 'Idle'
+      return t('status.idle')
     case 'recording':
-      return 'Recording'
+      return t('status.recording')
     case 'transcribing':
-      return 'Transcribing'
+      return t('status.transcribing')
     case 'polishing':
-      return 'Polishing'
+      return t('status.polishing')
     case 'done':
-      return 'Done'
+      return t('status.done')
     case 'error':
-      return 'Error'
+      return t('status.error')
     default:
       return stage
   }
 }
 
 function App() {
+  const { locale, setLocale } = useLocale()
   const [page, setPage] = useState<Page>('home')
   const [isRecording, setIsRecording] = useState(false)
   const [isWorking, setIsWorking] = useState(false)
@@ -151,8 +154,12 @@ function App() {
   const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
   const [config, setConfig] = useState<AppConfig>(defaultConfig)
   const [isLoadingConfig, setIsLoadingConfig] = useState(true)
-  const [settingsStatus, setSettingsStatus] = useState<string | null>(null)
+  const [settingsStatus, setSettingsStatus] = useState<SettingsStatusKey | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
 
   useEffect(() => {
     let mounted = true
@@ -166,7 +173,7 @@ function App() {
         }
       } catch (err) {
         if (mounted) {
-          setError(`Failed to load config: ${String(err)}`)
+          setError(`${t('error.failedLoadConfig')}: ${String(err)}`)
         }
       } finally {
         if (mounted) {
@@ -268,36 +275,36 @@ function App() {
 
   const saveSettings = async () => {
     setError(null)
-    setSettingsStatus('Saving...')
+    setSettingsStatus('settings.saving')
 
     try {
       await invoke('save_config', { config })
-      setSettingsStatus('Saved')
+      setSettingsStatus('settings.saved')
     } catch (err) {
-      setSettingsStatus(null)
-      setError(`Failed to save config: ${String(err)}`)
+      setSettingsStatus('settings.saveFailed')
+      setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
     }
   }
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">OT</div>
           <div>
-            <p className="brand-title">OpenTypeless</p>
-            <p className="brand-subtitle">BYOK dictation</p>
+            <p className="brand-title">{t('app.title')}</p>
+            <p className="brand-subtitle">{t('app.subtitle')}</p>
           </div>
         </div>
 
         <nav className="nav">
           <button type="button" className={`nav-item ${page === 'home' ? 'active' : ''}`} onClick={() => setPage('home')}>
             <span>🏠</span>
-            <span>Home</span>
+            <span>{t('nav.home')}</span>
           </button>
           <button type="button" className={`nav-item ${page === 'history' ? 'active' : ''}`} onClick={() => setPage('history')}>
             <span>🕘</span>
-            <span>History</span>
+            <span>{t('nav.history')}</span>
           </button>
           <button
             type="button"
@@ -305,7 +312,7 @@ function App() {
             onClick={() => setPage('settings')}
           >
             <span>⚙️</span>
-            <span>Settings</span>
+            <span>{t('nav.settings')}</span>
           </button>
         </nav>
       </aside>
@@ -314,15 +321,15 @@ function App() {
         {isRecording && (
           <div className="recording-overlay">
             <span className="recording-dot" />
-            Recording...
+            {t('overlay.recording')}
           </div>
         )}
 
         {page === 'home' && (
           <section className="page">
             <header className="hero">
-              <h1>OpenTypeless</h1>
-              <p>Voice to text, your way</p>
+              <h1>{t('home.title')}</h1>
+              <p>{t('home.tagline')}</p>
             </header>
 
             <div className="card recorder-card">
@@ -334,7 +341,7 @@ function App() {
               >
                 <span className="mic-icon">🎤</span>
               </button>
-              <p className="record-hint">{isRecording ? 'Click to stop' : 'Click to start'}</p>
+              <p className="record-hint">{isRecording ? t('home.clickToStop') : t('home.clickToStart')}</p>
 
               <div className="pipeline-track">
                 {['idle', 'recording', 'transcribing', 'polishing', 'done'].map((stage) => (
@@ -350,28 +357,28 @@ function App() {
 
             <div className="grid-2">
               <article className="card stats-card">
-                <h2>Stats</h2>
+                <h2>{t('home.stats')}</h2>
                 <div className="stat-row">
-                  <span>Total dictations</span>
+                  <span>{t('home.totalDictations')}</span>
                   <strong>{history.length}</strong>
                 </div>
                 <div className="stat-row">
-                  <span>Total words</span>
+                  <span>{t('home.totalWords')}</span>
                   <strong>{totalWords}</strong>
                 </div>
               </article>
 
               <article className="card result-card">
-                <h2>Last transcription</h2>
-                {!lastResult && <p className="muted">No transcription yet.</p>}
+                <h2>{t('home.lastTranscription')}</h2>
+                {!lastResult && <p className="muted">{t('home.noTranscriptionYet')}</p>}
                 {lastResult && (
                   <div className="result-fields">
                     <div>
-                      <p className="field-label">Raw</p>
+                      <p className="field-label">{t('home.raw')}</p>
                       <p>{lastResult.raw_text}</p>
                     </div>
                     <div>
-                      <p className="field-label">Polished</p>
+                      <p className="field-label">{t('home.polished')}</p>
                       <p>{lastResult.polished_text}</p>
                     </div>
                   </div>
@@ -384,20 +391,20 @@ function App() {
         {page === 'history' && (
           <section className="page">
             <header className="page-header">
-              <h1>History</h1>
-              <p>Past transcriptions stored locally.</p>
+              <h1>{t('history.title')}</h1>
+              <p>{t('history.subtitle')}</p>
             </header>
 
             <div className="history-list">
-              {history.length === 0 && <p className="card muted">No history yet.</p>}
+              {history.length === 0 && <p className="card muted">{t('history.empty')}</p>}
               {history.map((entry) => (
                 <article key={entry.id} className="card history-item">
-                  <p className="history-time">{new Date(entry.timestamp).toLocaleString()}</p>
+                  <p className="history-time">{new Date(entry.timestamp).toLocaleString(locale)}</p>
                   <p>
-                    <span className="field-label">Raw:</span> {entry.rawText}
+                    <span className="field-label">{t('history.rawLabel')}</span> {entry.rawText}
                   </p>
                   <p>
-                    <span className="field-label">Polished:</span> {entry.polishedText}
+                    <span className="field-label">{t('history.polishedLabel')}</span> {entry.polishedText}
                   </p>
                 </article>
               ))}
@@ -408,18 +415,29 @@ function App() {
         {page === 'settings' && (
           <section className="page">
             <header className="page-header">
-              <h1>Settings</h1>
-              <p>Configure hotkey, STT, and LLM providers.</p>
+              <h1>{t('settings.title')}</h1>
+              <p>{t('settings.subtitle')}</p>
             </header>
 
             <div className="card settings-form">
               <label>
-                <span>Keyboard Shortcut</span>
-                <input value="Cmd+Shift+Space" disabled />
+                <span>{t('settings.uiLanguage')}</span>
+                <select value={locale} onChange={(event) => setLocale(event.target.value as (typeof LOCALES)[number]['code'])}>
+                  {LOCALES.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.nativeName}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label>
-                <span>Primary Language</span>
+                <span>{t('settings.shortcut')}</span>
+                <input value={t('settings.shortcutValue')} disabled />
+              </label>
+
+              <label>
+                <span>{t('settings.primaryLanguage')}</span>
                 <select
                   value={config.stt.groq.language ?? 'auto'}
                   onChange={(event) =>
@@ -436,15 +454,15 @@ function App() {
                   }
                   disabled={isLoadingConfig}
                 >
-                  <option value="auto">Auto</option>
-                  <option value="en">English</option>
-                  <option value="zh">Chinese</option>
-                  <option value="ja">Japanese</option>
+                  <option value="auto">{t('settings.languageAuto')}</option>
+                  <option value="en">{t('settings.languageEnglish')}</option>
+                  <option value="zh">{t('settings.languageChinese')}</option>
+                  <option value="ja">{t('settings.languageJapanese')}</option>
                 </select>
               </label>
 
               <label>
-                <span>STT Provider</span>
+                <span>{t('settings.sttProvider')}</span>
                 <select
                   value={config.stt.provider}
                   onChange={(event) =>
@@ -458,13 +476,13 @@ function App() {
                   }
                   disabled={isLoadingConfig}
                 >
-                  <option value="groq">Groq</option>
-                  <option value="mock">Mock</option>
+                  <option value="groq">{t('settings.sttProviderGroq')}</option>
+                  <option value="mock">{t('settings.sttProviderMock')}</option>
                 </select>
               </label>
 
               <label>
-                <span>STT API Key</span>
+                <span>{t('settings.sttApiKey')}</span>
                 <input
                   type="password"
                   value={config.stt.api_key}
@@ -477,14 +495,14 @@ function App() {
                       },
                     }))
                   }
-                  placeholder="gsk_..."
+                  placeholder={t('settings.sttApiKeyPlaceholder')}
                   disabled={isLoadingConfig}
                 />
               </label>
 
               {config.stt.provider === 'groq' && (
                 <label>
-                  <span>STT Model</span>
+                  <span>{t('settings.sttModel')}</span>
                   <input
                     value={config.stt.groq.model}
                     onChange={(event) =>
@@ -507,7 +525,7 @@ function App() {
               <hr />
 
               <label>
-                <span>LLM Provider</span>
+                <span>{t('settings.llmProvider')}</span>
                 <select
                   value={config.llm.provider}
                   onChange={(event) =>
@@ -521,15 +539,15 @@ function App() {
                   }
                   disabled={isLoadingConfig}
                 >
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI-compatible</option>
-                  <option value="none">None</option>
+                  <option value="gemini">{t('settings.llmProviderGemini')}</option>
+                  <option value="openai">{t('settings.llmProviderOpenAiCompatible')}</option>
+                  <option value="none">{t('settings.llmProviderNone')}</option>
                 </select>
               </label>
 
               {config.llm.provider !== 'none' && (
                 <label>
-                  <span>LLM API Key</span>
+                  <span>{t('settings.llmApiKey')}</span>
                   <input
                     type="password"
                     value={config.llm.api_key}
@@ -542,7 +560,7 @@ function App() {
                         },
                       }))
                     }
-                    placeholder="API key"
+                    placeholder={t('settings.llmApiKeyPlaceholder')}
                     disabled={isLoadingConfig}
                   />
                 </label>
@@ -550,7 +568,7 @@ function App() {
 
               {config.llm.provider === 'gemini' && (
                 <label>
-                  <span>Gemini Model</span>
+                  <span>{t('settings.geminiModel')}</span>
                   <input
                     value={config.llm.gemini.model}
                     onChange={(event) =>
@@ -573,7 +591,7 @@ function App() {
               {config.llm.provider === 'openai' && (
                 <>
                   <label>
-                    <span>Model</span>
+                    <span>{t('settings.llmModel')}</span>
                     <input
                       value={config.llm.openai.model}
                       onChange={(event) =>
@@ -593,7 +611,7 @@ function App() {
                   </label>
 
                   <label>
-                    <span>Base URL</span>
+                    <span>{t('settings.llmBaseUrl')}</span>
                     <input
                       value={config.llm.openai.base_url}
                       onChange={(event) =>
@@ -608,7 +626,7 @@ function App() {
                           },
                         }))
                       }
-                      placeholder="https://api.openai.com"
+                      placeholder={t('settings.llmBaseUrlPlaceholder')}
                       disabled={isLoadingConfig}
                     />
                   </label>
@@ -616,7 +634,7 @@ function App() {
               )}
 
               <label>
-                <span>System Prompt</span>
+                <span>{t('settings.systemPrompt')}</span>
                 <textarea
                   rows={6}
                   value={config.llm.system_prompt}
@@ -634,9 +652,9 @@ function App() {
               </label>
 
               <button type="button" className="primary" onClick={saveSettings} disabled={isLoadingConfig}>
-                Save Settings
+                {t('settings.save')}
               </button>
-              {settingsStatus && <p className="muted">{settingsStatus}</p>}
+              {settingsStatus && <p className="muted">{t(settingsStatus)}</p>}
             </div>
           </section>
         )}
