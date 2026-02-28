@@ -6,9 +6,10 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
-use crate::config::load_or_create_config;
+use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
+use crate::llm::create_provider as create_llm_provider;
 use crate::paste::{copy_to_clipboard, paste_text};
-use crate::stt::create_provider;
+use crate::stt::create_provider as create_stt_provider;
 
 enum AudioRequest {
     Start(mpsc::Sender<Result<(), AudioError>>),
@@ -22,7 +23,8 @@ pub struct AppState {
 #[derive(Serialize)]
 pub struct TranscriptionResult {
     wav_base64: String,
-    text: String,
+    raw_text: String,
+    polished_text: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -71,6 +73,16 @@ impl AppState {
 }
 
 #[tauri::command]
+pub fn get_config() -> Result<AppConfig, String> {
+    load_or_create_config().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn save_config(config: AppConfig) -> Result<(), String> {
+    persist_config(&config).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn start_recording(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     state.start_recording().map_err(|err| err.to_string())?;
     app.emit("recording-state-changed", true)
@@ -100,14 +112,23 @@ pub fn stop_recording_and_transcribe(
     emit_pipeline_status(&app, "transcribing", None, None);
 
     let config = load_or_create_config().map_err(|err| err.to_string())?;
-    let provider = create_provider(&config.stt).map_err(|err| err.to_string())?;
-    log::info!("transcribing audio with stt provider: {}", provider.name());
-    let text = provider.transcribe(&wav).map_err(|err| err.to_string())?;
-    emit_pipeline_status(&app, "done", Some(&text), None);
+    let stt_provider = create_stt_provider(&config.stt).map_err(|err| err.to_string())?;
+    log::info!(
+        "transcribing audio with stt provider: {}",
+        stt_provider.name()
+    );
+    let raw_text = stt_provider
+        .transcribe(&wav)
+        .map_err(|err| err.to_string())?;
+
+    emit_pipeline_status(&app, "polishing", None, None);
+    let polished_text = polish_text_with_fallback(&config, &raw_text);
+    emit_pipeline_status(&app, "done", Some(&polished_text), None);
 
     Ok(TranscriptionResult {
         wav_base64: base64::engine::general_purpose::STANDARD.encode(wav),
-        text,
+        raw_text,
+        polished_text,
     })
 }
 
@@ -155,7 +176,7 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
         }
     };
 
-    let provider = match create_provider(&config.stt) {
+    let stt_provider = match create_stt_provider(&config.stt) {
         Ok(provider) => provider,
         Err(err) => {
             let message = format!("failed to create stt provider: {err}");
@@ -165,8 +186,11 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
         }
     };
 
-    log::info!("transcribing audio with stt provider: {}", provider.name());
-    let text = match provider.transcribe(&wav) {
+    log::info!(
+        "transcribing audio with stt provider: {}",
+        stt_provider.name()
+    );
+    let raw_text = match stt_provider.transcribe(&wav) {
         Ok(text) => text,
         Err(err) => {
             let message = format!("transcription failed: {err}");
@@ -176,16 +200,17 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
         }
     };
 
-    emit_pipeline_status(&app, "pasting", None, None);
+    emit_pipeline_status(&app, "polishing", None, None);
+    let polished_text = polish_text_with_fallback(&config, &raw_text);
 
     let mut done_message = None::<String>;
-    if let Err(err) = paste_text(&text) {
+    if let Err(err) = paste_text(&polished_text) {
         log::warn!("paste simulation failed: {err}");
         done_message = Some(format!(
             "paste simulation failed; text copied to clipboard instead: {err}"
         ));
 
-        if let Err(copy_err) = copy_to_clipboard(&text) {
+        if let Err(copy_err) = copy_to_clipboard(&polished_text) {
             let message = format!("clipboard fallback failed: {copy_err}");
             log::error!("{message}");
             emit_pipeline_status(&app, "error", None, Some(&message));
@@ -193,7 +218,26 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
         }
     }
 
-    emit_pipeline_status(&app, "done", Some(&text), done_message.as_deref());
+    emit_pipeline_status(&app, "done", Some(&polished_text), done_message.as_deref());
+}
+
+fn polish_text_with_fallback(config: &AppConfig, raw_text: &str) -> String {
+    let llm_provider = match create_llm_provider(&config.llm) {
+        Ok(provider) => provider,
+        Err(err) => {
+            log::warn!("failed to create llm provider; fallback to raw text: {err}");
+            return raw_text.to_string();
+        }
+    };
+
+    log::info!("polishing text with llm provider: {}", llm_provider.name());
+    match llm_provider.polish(raw_text, &config.llm.system_prompt) {
+        Ok(polished_text) => polished_text,
+        Err(err) => {
+            log::warn!("llm polishing failed; fallback to raw text: {err}");
+            raw_text.to_string()
+        }
+    }
 }
 
 fn emit_pipeline_status(app: &AppHandle, stage: &str, text: Option<&str>, message: Option<&str>) {
