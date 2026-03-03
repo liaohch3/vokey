@@ -1,241 +1,91 @@
-# Vokey — Agent Instructions
+# AGENTS.md — Vokey
 
-## Project Identity
+本文件是**目录**，不是百科全书。
+先读这里，然后按指引深入具体文档。
 
-Open-source, BYOK voice dictation for macOS (Windows later).  
-Tauri v2 + Rust backend + React/TypeScript frontend.  
-Core loop: **hotkey → record → STT → LLM polish → paste at cursor**.
+## 项目定位
 
----
+开源、BYOK 语音输入桌面应用，macOS 优先（后续支持 Windows）。
+技术栈：Tauri v2 + Rust 后端 + React/TypeScript 前端。
+核心链路：**快捷键 → 录音 → STT → LLM 润色 → 粘贴到光标处**。
 
-## Pre-commit CI checks
+## 不可违反的规则
 
-Before every `git commit`, run these checks locally (mirrors GitHub CI):
+1. **每次提交前必须跑 gate check** — 见 `docs/standards/validation-and-gates.md`
+2. **一次提交只做一件事** — 不混合重构和功能
+3. **代码/注释/文档/提交信息用英文**（例外：`README_zh.md`、中文文档）
+4. **UI 变更必须截图** — PR body 里附上截图
+5. **编码前跑 pre-work 检查清单**，**开 PR 前跑 pre-PR 检查清单**
+6. **必须推送并开 PR** — `gh pr create` 跑了才算完
+7. **复杂功能需要执行计划** — 放在 `docs/plans/`
 
-```bash
-# Rust
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test
+## 标准目录
 
-# Frontend
-cd frontend && npm run lint && npm run typecheck && npm test
-```
+| 标准 | 位置 |
+|------|------|
+| 硬性规则 | `docs/standards/hard-rules.md` |
+| 验证门禁 | `docs/standards/validation-and-gates.md` |
+| 编码规范 | `docs/standards/coding-standards.md` |
+| 架构 | `docs/standards/architecture.md` |
+| Auto-pilot 工作流 | `docs/standards/autopilot.md` |
+| 调试标准 | `docs/standards/debugging-standards.md` |
+| 截图标准 | `docs/standards/screenshot-standards.md` |
 
-All must pass before committing.
-
-## Pre-work Checklist
-
-Before any code change, run:
-
-```bash
-git diff --stat            # Check for uncommitted changes
-git log --oneline -10      # Understand recent history
-git fetch origin           # Get latest remote state
-```
-
-Ensure you are working on a clean, up-to-date branch.
-
----
-
-## Verification Loop (NON-NEGOTIABLE)
-
-Every feature must be verified end-to-end before merge. No exceptions.
-
-### Levels of verification
-
-| Level | What | When |
-|-------|------|------|
-| **L0 — Unit** | `cargo test` + `npm test` | Every commit |
-| **L1 — Integration** | Cross-layer tests (Rust↔Frontend via Tauri commands) | Every PR |
-| **L2 — E2E Manual** | Record voice → see text pasted in a real app | Every milestone feature |
-| **L3 — Regression** | Run full test suite + L2 on release branches | Every release |
-
-### E2E Validation Requirements
-
-For changes affecting: audio capture, STT pipeline, LLM processing, hotkey handling, or text pasting:
-
-1. Build the app: `cargo tauri dev`
-2. Test the full loop: press hotkey → speak → verify text appears at cursor
-3. Record evidence (screenshot or terminal output) in PR description
-4. Test with at least 2 STT providers (e.g., Groq + local Whisper)
-
-If E2E cannot run (e.g., no API key in CI), document the reason and residual risk in PR.
-
-### CI Pipeline
+## 架构速览
 
 ```
-lint (fmt + clippy + eslint) → unit tests → build check → integration tests
+frontend/src/          → React UI（页面、组件、i18n）
+src-tauri/src/         → Rust 后端
+  ├── audio.rs         → 麦克风采集（cpal）
+  ├── commands.rs      → Tauri 命令 + 管线编排
+  ├── config.rs        → TOML 配置 ~/.vokey/config.toml
+  ├── paste.rs         → 剪贴板 + Cmd+V 模拟
+  ├── stt/             → STT provider trait + 实现
+  └── llm/             → LLM provider trait + 实现
+docs/
+  ├── design/          → 产品和 UI 设计文档
+  ├── standards/       → 工程标准（本目录）
+  └── plans/           → 执行计划（active / completed / cancelled）
+scripts/               → CI、lint、自动化脚本
+.agents/skills/        → Agent 技能（可复用的任务配方）
 ```
 
-Integration tests use mock STT/LLM providers to avoid API key requirements in CI.
+## 配置
 
----
+TOML 文件位于 `~/.vokey/config.toml`，schema 见 `src-tauri/src/config.rs`。
 
-## Language
-
-All code, comments, commit messages, docs, and skill files must be in English.
-Exception: Chinese-specific docs like `README_zh.md`.
-
----
-
-## Coding Standards
-
-### DO
-
-| Practice | Why |
-|----------|-----|
-| Delete dead code | Dead code misleads and rots |
-| Fix root cause of test failures | Patching symptoms creates fragile tests |
-| Use existing patterns | Consistency beats novelty |
-| Modify only relevant files | Minimize blast radius |
-| Keep functions focused | One function, one purpose |
-| Trust type invariants | Don't add redundant runtime checks for typed values |
-| Provider-agnostic interfaces | Every STT/LLM provider behind a trait/interface |
-| Test with mock providers | CI must never require real API keys |
-
-### DON'T
-
-| Anti-pattern | Why |
-|--------------|-----|
-| Leave commented-out code | Use version control, not comments |
-| Add speculative abstractions | YAGNI — wait until you need it |
-| Suppress linter warnings without justification | Fix or document false positives |
-| Commit generated files | Regenerate from source |
-| Mix refactoring with feature work | One concern per commit |
-| Hardcode provider-specific logic in core | Everything goes through traits |
-| Skip E2E for "trivial" changes | The pipeline is the product |
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│                  Frontend                    │
-│            React + TypeScript                │
-│  ┌─────────┐ ┌──────────┐ ┌──────────────┐ │
-│  │ Overlay  │ │ Settings │ │   History    │ │
-│  │ (record) │ │  (keys)  │ │  (SQLite)   │ │
-│  └────┬─────┘ └────┬─────┘ └──────┬──────┘ │
-│       │             │              │         │
-│       └─────────────┴──────────────┘         │
-│                     │ Tauri Commands          │
-├─────────────────────┴───────────────────────┤
-│                 Rust Backend                  │
-│  ┌──────────┐ ┌───────────┐ ┌────────────┐  │
-│  │  Audio   │ │    STT    │ │  LLM       │  │
-│  │ Capture  │ │ Provider  │ │ Provider   │  │
-│  │ (cpal)   │ │  (trait)  │ │  (trait)   │  │
-│  └────┬─────┘ └─────┬─────┘ └─────┬──────┘  │
-│       │              │             │          │
-│  ┌────┴──────────────┴─────────────┴───────┐ │
-│  │            Pipeline Orchestrator         │ │
-│  │  record → STT → polish → paste          │ │
-│  └──────────────────────────────────────────┘ │
-│  ┌──────────┐ ┌───────────┐ ┌────────────┐  │
-│  │ Hotkey   │ │  Config   │ │  Keychain  │  │
-│  │ Manager  │ │ (TOML)    │ │ (API keys) │  │
-│  └──────────┘ └───────────┘ └────────────┘  │
-└──────────────────────────────────────────────┘
-```
-
-### Key Traits
+## 核心 Trait
 
 ```rust
-trait SttProvider {
-    async fn transcribe(&self, audio: &[u8], config: &SttConfig) -> Result<String>;
+// STT — src-tauri/src/stt/mod.rs
+trait SttProvider: Send + Sync {
+    fn transcribe(&self, wav_data: &[u8]) -> Result<String, SttError>;
+    fn name(&self) -> &str;
 }
 
-trait LlmProvider {
-    async fn polish(&self, raw_text: &str, context: &PolishContext) -> Result<String>;
+// LLM — src-tauri/src/llm/mod.rs
+trait LlmProvider: Send + Sync {
+    fn polish(&self, raw_text: &str, system_prompt: &str) -> Result<String, LlmError>;
+    fn name(&self) -> &str;
 }
 ```
 
-Implementations:
-- **STT**: `GroqWhisper`, `OpenAiWhisper`, `GeminiAudio`, `LocalWhisper`
-- **LLM**: `OpenRouter`, `Groq`, `OpenAi`, `Gemini`, `Ollama`
+## Brain + Hands 协议
 
-### Config
+- **人 / Claude Opus** = 规划大脑。架构、设计、审查决策。
+- **Codex** = 执行双手。写代码、跑测试、开 PR。
 
-TOML file at `~/.vokey/config.toml`:
+不要把架构决策交给执行工具。
+能让 Codex 写的代码就不要手写。
 
-```toml
-[hotkey]
-trigger = "CmdOrCtrl+Shift+Space"
+## 复合工程
 
-[stt]
-provider = "groq"          # groq | openai | gemini | local
-# API keys stored in OS keychain, not config file
+记录经验教训：
+- 踩坑记录：`docs/error-experience/YYYY-MM-DD-<slug>.md`
+- 好的实践：`docs/good-experience/YYYY-MM-DD-<slug>.md`
 
-[llm]
-provider = "openrouter"    # openrouter | groq | openai | gemini | ollama
-model = "anthropic/claude-haiku-4-5"
+## Auto-pilot
 
-[polish]
-default_prompt = "Clean up this dictation..."
-remove_fillers = true
-language = "auto"          # auto | zh | en | ...
+完整工作流见 `docs/standards/autopilot.md`。
 
-[polish.app_prompts]
-slack = "Casual, concise tone"
-email = "Professional, polished tone"
-code = "Convert to code comments or variable names"
-```
-
----
-
-## Worktree Workflow
-
-```bash
-git worktree add -b feat/<name> /tmp/vokey-<name> main
-cd /tmp/vokey-<name>
-# develop and test
-cd /path/to/vokey
-git merge --ff-only feat/<name>
-git worktree remove /tmp/vokey-<name>
-git branch -d feat/<name>
-```
-
----
-
-## Compounding Engineering
-
-Record lessons learned:
-
-- **Error experience**: `docs/error-experience/YYYY-MM-DD-<slug>.md`
-- **Good experience**: `docs/good-experience/YYYY-MM-DD-<slug>.md`
-- **Plans**: `docs/plans/`
-
----
-
-## Code Review
-
-Before every commit:
-
-1. `cargo fmt --check` + `cargo clippy` — Rust lint
-2. `npm run lint` + `npm run typecheck` — Frontend lint
-3. `cargo test` + `npm test` — Tests pass
-4. `git diff` — Review every changed line
-5. Verify scope: only relevant files modified
-
----
-
-## Brain + Hands Protocol
-
-- **Claude Code (Opus)** = planning brain. Architecture, API design, pattern decisions.
-- **Codex** = execution hands. Writes code, runs tests, applies changes.
-
-Never delegate architecture to execution tools.
-
----
-
-## Release Checklist
-
-- [ ] All L0 tests pass
-- [ ] L1 integration tests pass
-- [ ] L2 E2E manual test completed and documented
-- [ ] CHANGELOG.md updated
-- [ ] Version bumped in `Cargo.toml` and `package.json`
-- [ ] `cargo tauri build` produces working binary
-- [ ] Binary tested on clean macOS install (or VM)
+一句话：人提需求 → Codex 写代码 + 测试 → Agent 自审 → PR → CI 验证 → 人合并。
