@@ -4,21 +4,21 @@ last_reviewed: 2026-03-03
 source_of_truth: AGENTS.md
 ---
 
-# Standards Metadata
+# 标准元数据
 
-All files in `docs/standards/*.md` must include YAML frontmatter with:
+`docs/standards/*.md` 下所有文件必须包含 YAML frontmatter：
 
-- `owner`: team or maintainer responsible for updates
-- `last_reviewed`: ISO date `YYYY-MM-DD` of the last policy review
-- `source_of_truth`: canonical policy source reference
+- `owner`：负责更新的团队或维护者
+- `last_reviewed`：最后审查日期，ISO 格式 `YYYY-MM-DD`
+- `source_of_truth`：规范策略的权威来源
 
-## Maintenance
+## 维护流程
 
-1. Update the affected standards file and refresh `last_reviewed`.
-2. Keep `AGENTS.md` as a concise index that links to the updated file.
-3. Run `python3 scripts/check_legibility.py` locally to validate.
-4. If policy behavior changed, record rationale in PR description.
+1. 更新相关标准文件，刷新 `last_reviewed`。
+2. 保持 `AGENTS.md` 作为简洁的索引，指向更新后的文件。
+3. 本地运行 `python3 scripts/check_legibility.py` 验证。
+4. 如果策略行为发生了变化，在 PR 描述中记录原因。
 
-## Freshness
+## 新鲜度
 
-Standards older than 60 days trigger a warning. This is enforced by the legibility CI check.
+超过 60 天未审查的标准会触发警告，由 legibility CI 检查强制执行。

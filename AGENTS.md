@@ -1,58 +1,58 @@
 # AGENTS.md — Vokey
 
-This file is the **table of contents**, not the encyclopedia.
-Read it first, then follow pointers to deeper docs as needed.
+本文件是**目录**，不是百科全书。
+先读这里，然后按指引深入具体文档。
 
-## Project Identity
+## 项目定位
 
-Open-source, BYOK voice dictation for macOS (Windows later).
-Tauri v2 + Rust backend + React/TypeScript frontend.
-Core loop: **hotkey → record → STT → LLM polish → paste at cursor**.
+开源、BYOK 语音输入桌面应用，macOS 优先（后续支持 Windows）。
+技术栈：Tauri v2 + Rust 后端 + React/TypeScript 前端。
+核心链路：**快捷键 → 录音 → STT → LLM 润色 → 粘贴到光标处**。
 
-## Non-negotiable Rules
+## 不可违反的规则
 
-1. **Gate checks before every commit** — see `docs/standards/validation-and-gates.md`
-2. **One concern per commit** — no mixed refactor + feature
-3. **English only** in code/comments/docs/commits (exception: `README_zh.md`)
-4. **Evidence required** for UI changes — screenshots in PR body
-5. **Pre-work checklist** before coding, **pre-PR checklist** before opening PR
-6. **Must push and open PR** — work isn't done until `gh pr create` runs
-7. **Plans are first-class** — complex work needs an execution plan in `docs/plans/`
+1. **每次提交前必须跑 gate check** — 见 `docs/standards/validation-and-gates.md`
+2. **一次提交只做一件事** — 不混合重构和功能
+3. **代码/注释/文档/提交信息用英文**（例外：`README_zh.md`、中文文档）
+4. **UI 变更必须截图** — PR body 里附上截图
+5. **编码前跑 pre-work 检查清单**，**开 PR 前跑 pre-PR 检查清单**
+6. **必须推送并开 PR** — `gh pr create` 跑了才算完
+7. **复杂功能需要执行计划** — 放在 `docs/plans/`
 
-## Standards Catalog
+## 标准目录
 
-| Standard | Location |
-|----------|----------|
-| Hard rules | `docs/standards/hard-rules.md` |
-| Validation gates | `docs/standards/validation-and-gates.md` |
-| Coding standards | `docs/standards/coding-standards.md` |
-| Architecture | `docs/standards/architecture.md` |
-| Auto-pilot workflow | `docs/standards/autopilot.md` |
+| 标准 | 位置 |
+|------|------|
+| 硬性规则 | `docs/standards/hard-rules.md` |
+| 验证门禁 | `docs/standards/validation-and-gates.md` |
+| 编码规范 | `docs/standards/coding-standards.md` |
+| 架构 | `docs/standards/architecture.md` |
+| Auto-pilot 工作流 | `docs/standards/autopilot.md` |
 
-## Architecture (quick map)
+## 架构速览
 
 ```
-frontend/src/          → React UI (pages, components, i18n)
-src-tauri/src/         → Rust backend
-  ├── audio.rs         → mic capture (cpal)
-  ├── commands.rs      → Tauri command handlers + pipeline orchestrator
-  ├── config.rs        → TOML config at ~/.vokey/config.toml
-  ├── paste.rs         → clipboard + Cmd+V simulation
-  ├── stt/             → STT provider trait + implementations
-  └── llm/             → LLM provider trait + implementations
+frontend/src/          → React UI（页面、组件、i18n）
+src-tauri/src/         → Rust 后端
+  ├── audio.rs         → 麦克风采集（cpal）
+  ├── commands.rs      → Tauri 命令 + 管线编排
+  ├── config.rs        → TOML 配置 ~/.vokey/config.toml
+  ├── paste.rs         → 剪贴板 + Cmd+V 模拟
+  ├── stt/             → STT provider trait + 实现
+  └── llm/             → LLM provider trait + 实现
 docs/
-  ├── design/          → product & UI design specs
-  ├── standards/       → engineering standards (this catalog)
-  └── plans/           → execution plans (active, completed, cancelled)
-scripts/               → CI, linting, automation scripts
-.agents/skills/        → agent skills (reusable task recipes)
+  ├── design/          → 产品和 UI 设计文档
+  ├── standards/       → 工程标准（本目录）
+  └── plans/           → 执行计划（active / completed / cancelled）
+scripts/               → CI、lint、自动化脚本
+.agents/skills/        → Agent 技能（可复用的任务配方）
 ```
 
-## Config
+## 配置
 
-TOML at `~/.vokey/config.toml`. See `src-tauri/src/config.rs` for schema.
+TOML 文件位于 `~/.vokey/config.toml`，schema 见 `src-tauri/src/config.rs`。
 
-## Key Traits
+## 核心 Trait
 
 ```rust
 // STT — src-tauri/src/stt/mod.rs
@@ -68,22 +68,22 @@ trait LlmProvider: Send + Sync {
 }
 ```
 
-## Brain + Hands Protocol
+## Brain + Hands 协议
 
-- **Human / Claude Opus** = planning brain. Architecture, design, review decisions.
-- **Codex** = execution hands. Writes code, runs tests, opens PRs.
+- **人 / Claude Opus** = 规划大脑。架构、设计、审查决策。
+- **Codex** = 执行双手。写代码、跑测试、开 PR。
 
-Never delegate architecture decisions to execution tools.
-Never hand-write code when Codex can do it.
+不要把架构决策交给执行工具。
+能让 Codex 写的代码就不要手写。
 
-## Compounding Engineering
+## 复合工程
 
-Record lessons learned:
-- Error experience: `docs/error-experience/YYYY-MM-DD-<slug>.md`
-- Good experience: `docs/good-experience/YYYY-MM-DD-<slug>.md`
+记录经验教训：
+- 踩坑记录：`docs/error-experience/YYYY-MM-DD-<slug>.md`
+- 好的实践：`docs/good-experience/YYYY-MM-DD-<slug>.md`
 
 ## Auto-pilot
 
-See `docs/standards/autopilot.md` for the full self-iterating workflow.
+完整工作流见 `docs/standards/autopilot.md`。
 
-TL;DR: human submits requirement → Codex writes code + tests → agent reviews → PR opened → CI validates → human merges (or auto-merge if all checks pass).
+一句话：人提需求 → Codex 写代码 + 测试 → Agent 自审 → PR → CI 验证 → 人合并。

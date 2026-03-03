@@ -1,42 +1,42 @@
-# Skill: Implement Feature
+# 技能：实现功能
 
-Use this skill when implementing a feature from an execution plan.
+按执行计划实现功能时使用此技能。
 
-## Steps
+## 步骤
 
-1. Read `AGENTS.md` for project context
-2. Read the execution plan at `docs/plans/<plan-file>.md`
-3. Read relevant design docs referenced in the plan
-4. Read relevant source files to understand current state
+1. 读 `AGENTS.md` 了解项目上下文
+2. 读执行计划 `docs/plans/<plan-file>.md`
+3. 读计划中引用的相关设计文档
+4. 读相关源码了解当前状态
 
-5. For each task in the plan:
-   a. Implement the change
-   b. Run gate checks:
+5. 对计划中的每个任务：
+   a. 实现改动
+   b. 跑 gate check：
       ```bash
       cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test
       cd ../frontend && npm run lint && npm run build
       ```
-   c. Fix any issues
-   d. Update the plan file: check off the task, log any decisions
+   c. 修复问题
+   d. 更新计划文件：勾选完成的任务，记录决策
 
-6. Self-review:
-   a. `git diff origin/main --stat` — verify scope
-   b. `git diff origin/main` — read every changed line
-   c. Verify acceptance criteria from the plan
+6. 自审：
+   a. `git diff origin/main --stat` — 确认范围
+   b. `git diff origin/main` — 逐行读每个改动
+   c. 验证计划中的验收标准
 
-7. Commit and push:
+7. 提交并推送：
    ```bash
    git add -A
    git commit -m "<type>: <description>"
    git push origin <branch>
    ```
 
-8. Open PR:
+8. 开 PR：
    ```bash
-   gh pr create --title "<type>: <description>" --body "<PR body with plan reference>"
+   gh pr create --title "<type>: <description>" --body "<PR body>"
    ```
 
-9. Notify completion:
+9. 通知完成：
    ```bash
-   openclaw system event --text "Done: <summary>" --mode now
+   openclaw system event --text "Done: <摘要>" --mode now
    ```

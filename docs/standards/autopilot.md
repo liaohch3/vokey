@@ -4,23 +4,23 @@ last_reviewed: 2026-03-03
 source_of_truth: AGENTS.md
 ---
 
-# Auto-pilot Workflow
+# Auto-pilot 工作流
 
-## Overview
+## 概述
 
-The auto-pilot system enables a fully agent-driven development loop:
+Auto-pilot 实现完全 agent 驱动的开发闭环：
 
 ```
-Human requirement → Execution plan → Codex implements → Agent reviews → CI validates → PR ready
+人提需求 → 执行计划 → Codex 实现 → Agent 自审 → CI 验证 → PR 就绪
 ```
 
-Humans steer. Agents execute.
+人负责方向，Agent 负责执行。
 
-## The Loop
+## 闭环流程
 
-### Step 1: Requirement → Plan
+### 第 1 步：需求 → 计划
 
-Human describes what they want in natural language. The orchestrator (OpenClaw) translates this into an execution plan:
+人用自然语言描述需求。编排器（OpenClaw）转化为执行计划：
 
 ```markdown
 # docs/plans/YYYY-MM-DD-<slug>.md
@@ -30,105 +30,105 @@ priority: P0
 estimated_effort: M
 ---
 
-## Goal
-<one sentence>
+## 目标
+<一句话>
 
-## Context
-- Relevant design doc sections
-- Current code state
-- Dependencies
+## 上下文
+- 相关设计文档章节
+- 当前代码状态
+- 依赖关系
 
-## Tasks
-- [ ] Task 1: description (files: `path/to/file.rs`)
-- [ ] Task 2: description (files: `path/to/component.tsx`)
-- [ ] Task 3: write tests
-- [ ] Task 4: update i18n
-- [ ] Task 5: run gate checks
+## 任务
+- [ ] 任务 1：描述（文件：`path/to/file.rs`）
+- [ ] 任务 2：描述（文件：`path/to/component.tsx`）
+- [ ] 任务 3：写测试
+- [ ] 任务 4：更新 i18n
+- [ ] 任务 5：跑 gate check
 
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] All gate checks pass
+## 验收标准
+- [ ] 标准 1
+- [ ] 标准 2
+- [ ] 所有 gate check 通过
 
-## Decisions
-(filled in during execution)
+## 决策记录
+（执行过程中填写）
 ```
 
-### Step 2: Plan → Codex Execution
+### 第 2 步：计划 → Codex 执行
 
-The orchestrator launches Codex via tmux with a structured prompt:
+编排器通过 tmux 启动 Codex：
 
 ```bash
 tmux new-session -d -s vokey-<slug> -c /path/to/vokey
 tmux send-keys -t vokey-<slug> "codex --dangerously-bypass-approvals-and-sandbox \"
-Read AGENTS.md first.
-Read the execution plan at docs/plans/YYYY-MM-DD-<slug>.md.
-Execute all tasks in order.
-After each task, run gate checks (see docs/standards/validation-and-gates.md).
-Update the plan file: check off completed tasks, log decisions.
-When done, commit all changes and push to branch feat/<slug>.
-Then run: gh pr create --title '<title>' --body '<body>'
-Finally run: openclaw system event --text 'Done: <summary>' --mode now
+先读 AGENTS.md。
+读执行计划 docs/plans/YYYY-MM-DD-<slug>.md。
+按顺序执行所有任务。
+每完成一个任务，跑 gate check（见 docs/standards/validation-and-gates.md）。
+更新计划文件：勾选完成的任务，记录决策。
+完成后提交所有改动并推送到 feat/<slug> 分支。
+然后运行：gh pr create --title '<标题>' --body '<内容>'
+最后运行：openclaw system event --text 'Done: <摘要>' --mode now
 \"" Enter
 ```
 
-### Step 3: Agent Self-Review
+### 第 3 步：Agent 自审
 
-Before opening the PR, Codex performs self-review:
+开 PR 前，Codex 自我审查：
 
-1. Run all gate checks (fmt, clippy, test, lint, build)
-2. `git diff origin/main` — review every changed line
-3. Verify only relevant files changed (no scope creep)
-4. Check that all plan tasks are completed
-5. Verify acceptance criteria
-6. Update plan status to `completed`
+1. 跑所有 gate check（fmt、clippy、test、lint、build）
+2. `git diff origin/main` — 逐行审查每个改动
+3. 确认只改了相关文件（没有范围蔓延）
+4. 检查计划中所有任务是否完成
+5. 验证验收标准
+6. 更新计划状态为 `completed`
 
-### Step 4: CI Validation
+### 第 4 步：CI 验证
 
-GitHub Actions runs on every PR:
+GitHub Actions 在每个 PR 上运行：
 
 1. **Lint** — `cargo fmt --check` + `cargo clippy` + `npm run lint`
 2. **Build** — `cargo check` + `npm run build`
 3. **Test** — `cargo test`
-4. **Legibility** — `python scripts/check_legibility.py`
+4. **Legibility** — `python3 scripts/check_legibility.py`
 
-### Step 5: Human Review (optional)
+### 第 5 步：人审查（可选）
 
-Human receives PR link. Can:
-- Merge directly if CI passes and changes look good
-- Leave review comments → Codex responds and iterates
-- Request changes → new Codex run with feedback
+人收到 PR 链接，可以：
+- CI 通过且改动没问题 → 直接合并
+- 留评审意见 → Codex 响应并迭代
+- 要求改动 → 新一轮 Codex 执行
 
-## Monitoring
+## 监控
 
-A cron job monitors active Codex sessions:
+cron job 监控活跃的 Codex 会话：
 
-1. Check tmux pane output for progress/errors
-2. If Codex completes → run acceptance verification
-3. If Codex errors → report to human
-4. If Codex stalls (>30min no output) → alert human
+1. 检查 tmux 输出看进度/错误
+2. Codex 完成 → 跑验收验证
+3. Codex 出错 → 报告给人
+4. Codex 卡住（>30min 无输出）→ 告警
 
-## Plan Lifecycle
+## 计划生命周期
 
 ```
-active → completed     (all tasks done, PR merged)
-active → cancelled     (requirements changed, plan abandoned)
+active → completed     （所有任务完成，PR 合并）
+active → cancelled     （需求变了，计划废弃）
 ```
 
-Plans are versioned in git. Never delete a plan — mark it completed or cancelled.
+计划版本化到 git。不要删除计划 — 标记 completed 或 cancelled。
 
-## Conventions
+## 约定
 
-### Branch naming
+### 分支命名
 ```
-feat/<slug>          — new feature
-fix/<slug>           — bug fix
-refactor/<slug>      — code improvement
-docs/<slug>          — documentation only
-infra/<slug>         — CI, tooling, scripts
+feat/<slug>          — 新功能
+fix/<slug>           — 修 bug
+refactor/<slug>      — 代码改善
+docs/<slug>          — 纯文档
+infra/<slug>         — CI、工具、脚本
 ```
 
-### Commit messages
+### 提交信息
 ```
 feat: add OpenAI Whisper STT provider
 fix: handle empty audio buffer in pipeline
@@ -137,37 +137,37 @@ docs: update architecture diagram
 infra: add legibility CI workflow
 ```
 
-### PR body template
+### PR body 模板
 ```markdown
-## What
-<one sentence summary>
+## 做了什么
+<一句话摘要>
 
-## Why
-<motivation / linked plan>
+## 为什么
+<动机 / 关联的执行计划>
 
-## How
-<implementation approach>
+## 怎么做的
+<实现方案>
 
-## Plan
-Closes docs/plans/YYYY-MM-DD-<slug>.md
+## 计划
+关联 docs/plans/YYYY-MM-DD-<slug>.md
 
-## Checklist
-- [ ] Gate checks pass locally
-- [ ] Plan tasks all completed
-- [ ] Acceptance criteria met
-- [ ] i18n updated (if UI changed)
-- [ ] Screenshots attached (if UI changed)
+## 检查清单
+- [ ] 本地 gate check 通过
+- [ ] 计划任务全部完成
+- [ ] 验收标准全部满足
+- [ ] i18n 已更新（如果改了 UI）
+- [ ] 截图已附上（如果改了 UI）
 ```
 
-## Golden Principles
+## 黄金原则
 
-These are enforced mechanically and apply to all agent output:
+机械化强制执行，适用于所有 agent 输出：
 
-1. **Validate at boundaries** — parse and validate data at API/IPC edges
-2. **Traits over concrete types** — every provider behind a trait
-3. **Config-driven** — behavior controlled by `~/.vokey/config.toml`, not hardcoded
-4. **Test what matters** — unit tests for logic, integration tests for pipelines
-5. **Structured logging** — `log::info!()` with context, no `println!()`
-6. **i18n everything** — all user-visible strings through `t()` function
-7. **Boring tech** — prefer stable, well-documented, composable dependencies
-8. **Small PRs** — one concern per PR, easy to review and revert
+1. **边界验证** — 在 API/IPC 边界解析和验证数据
+2. **Trait 优先** — 每个 provider 都在 trait 后面
+3. **配置驱动** — 行为由 `~/.vokey/config.toml` 控制，不硬编码
+4. **测试有意义的东西** — 逻辑写单测，管线写集成测试
+5. **结构化日志** — `log::info!()` 带上下文，不用 `println!()`
+6. **i18n 一切** — 所有用户可见文案走 `t()` 函数
+7. **无聊的技术** — 优先选稳定、文档好、可组合的依赖
+8. **小 PR** — 一个 PR 一件事，容易审查和回滚

@@ -4,11 +4,11 @@ last_reviewed: 2026-03-03
 source_of_truth: AGENTS.md
 ---
 
-# Validation Gates
+# 验证门禁
 
-## Pre-commit Checks
+## 提交前检查
 
-Before every commit, run:
+每次提交前运行：
 
 ```bash
 # Rust
@@ -16,54 +16,54 @@ cargo fmt --check
 cargo clippy -- -D warnings
 cargo test
 
-# Frontend
+# 前端
 cd frontend && npm run lint && npm run build
 ```
 
-All checks must pass. If formatting fails, run `cargo fmt` and re-check.
+全部通过才能提交。格式化不过就跑 `cargo fmt` 再检查。
 
-## Pre-work Checklist
+## 编码前检查清单
 
-Before any code change:
+动手写代码前：
 
 ```bash
-git diff --stat            # Check for uncommitted changes
-git log --oneline -10      # Understand recent history
-git fetch origin           # Get latest remote state
-git rebase origin/main     # Stay up to date
+git diff --stat            # 有没有未提交的改动
+git log --oneline -10      # 了解最近的历史
+git fetch origin           # 拉最新远端
+git rebase origin/main     # 保持最新
 ```
 
-## Pre-PR Checklist
+## 开 PR 前检查清单
 
-Before opening a PR:
+开 PR 之前：
 
 ```bash
-# Ensure clean state
+# 确保干净状态
 git rebase origin/main
 
-# Run all gates
+# 跑所有门禁
 cargo fmt --check
 cargo clippy -- -D warnings
 cargo test
 cd frontend && npm run lint && npm run build
 
-# Review your own changes
+# 自审改动
 git diff origin/main --stat
-git diff origin/main           # Read every changed line
+git diff origin/main           # 逐行读每个改动
 
-# Verify scope: only relevant files modified
+# 确认范围：只改了相关文件
 ```
 
-## Verification Levels
+## 验证级别
 
-| Level | What | When |
-|-------|------|------|
-| **L0 — Unit** | `cargo test` + `npm run build` | Every commit |
-| **L1 — Lint** | `cargo clippy` + `npm run lint` + legibility checks | Every commit |
-| **L2 — E2E** | Build app with `cargo tauri dev`, test full voice loop | Milestone features |
-| **L3 — Release** | Full suite + E2E + binary test on clean install | Every release |
+| 级别 | 内容 | 时机 |
+|------|------|------|
+| **L0 — 单元** | `cargo test` + `npm run build` | 每次提交 |
+| **L1 — Lint** | `cargo clippy` + `npm run lint` + legibility 检查 | 每次提交 |
+| **L2 — E2E** | `cargo tauri dev` 构建应用，测试完整语音链路 | 里程碑功能 |
+| **L3 — 发布** | 全套测试 + E2E + 干净系统上测试二进制 | 每次发版 |
 
-## CI Pipeline
+## CI 管线
 
 ```
 lint (fmt + clippy + eslint) → build (cargo check + vite build) → test (cargo test) → legibility

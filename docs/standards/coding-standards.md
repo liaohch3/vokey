@@ -4,44 +4,44 @@ last_reviewed: 2026-03-03
 source_of_truth: AGENTS.md
 ---
 
-# Coding Standards
+# 编码规范
 
-## Do
+## 应该做
 
-| Practice | Why |
-|----------|-----|
-| Delete dead code | Dead code misleads and rots |
-| Fix root cause of test failures | Patching symptoms creates fragile tests |
-| Use existing patterns | Consistency beats novelty |
-| Modify only relevant files | Minimize blast radius |
-| Keep functions focused | One function, one purpose |
-| Provider-agnostic interfaces | Every STT/LLM provider behind a trait |
-| Parse at the boundary | Validate data shapes at API edges, not deep inside |
-| Prefer boring tech | Composable, stable, well-documented > clever |
+| 实践 | 原因 |
+|------|------|
+| 删除死代码 | 死代码误导人，会腐烂 |
+| 修根因 | 打补丁只会让测试越来越脆弱 |
+| 用现有模式 | 一致性比新颖性更重要 |
+| 只改相关文件 | 最小化爆炸半径 |
+| 函数职责单一 | 一个函数一件事 |
+| Provider 无关接口 | 所有 STT/LLM provider 都走 trait |
+| 边界解析 | 在 API 边界验证数据格式，不要在内部深处 |
+| 用无聊的技术 | 可组合、稳定、文档好 > 炫技 |
 
-## Don't
+## 不应该做
 
-| Anti-pattern | Why |
-|--------------|-----|
-| Leave commented-out code | Use version control |
-| Add speculative abstractions | YAGNI — wait until needed |
-| Suppress linter warnings without justification | Fix or document |
-| Commit generated files | Regenerate from source |
-| Mix refactoring with feature work | One concern per commit |
-| Hardcode provider-specific logic in core | Everything through traits |
-| Probe data YOLO-style | Validate boundaries, use typed structures |
-| Pull heavy dependencies for simple logic | Implement in-house if scope is small |
+| 反模式 | 原因 |
+|--------|------|
+| 留注释掉的代码 | 用版本控制 |
+| 加投机性抽象 | YAGNI — 需要时再加 |
+| 无理由压制 lint 警告 | 修掉或写注释说明 |
+| 提交生成文件 | 从源码重新生成 |
+| 重构和功能混在一个提交 | 一个提交一件事 |
+| 在核心代码写死 provider 逻辑 | 全走 trait |
+| YOLO 式数据探测 | 验证边界，用类型化结构 |
+| 为简单逻辑引入重依赖 | 范围小就自己实现 |
 
-## Rust Conventions
+## Rust 约定
 
-- Error types: define per-module enums implementing `Display` + `Error`
-- Config defaults: use `Default` trait + `serde(default)` for TOML fields
-- Blocking HTTP: ok for now (reqwest::blocking), migrate to async when streaming is needed
-- Logging: `log` crate, no `println!` in library code
+- 错误类型：每个模块定义枚举，实现 `Display` + `Error`
+- 配置默认值：用 `Default` trait + `serde(default)`
+- 阻塞 HTTP：目前 ok（reqwest::blocking），需要流式时再迁移 async
+- 日志：`log` crate，库代码不用 `println!`
 
-## Frontend Conventions
+## 前端约定
 
-- State: keep in React `useState` for now, extract to Zustand when component tree grows
-- Styling: CSS modules (`.css` files), no CSS-in-JS
-- i18n: all user-visible strings go through `t()` function
-- No `any` types in TypeScript
+- 状态：目前用 React `useState`，组件树变大后提取到 Zustand
+- 样式：CSS 文件，不用 CSS-in-JS
+- i18n：所有用户可见文案走 `t()` 函数
+- TypeScript 不允许 `any` 类型
