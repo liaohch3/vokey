@@ -1,3 +1,9 @@
+---
+status: completed
+priority: P0
+estimated_effort: L
+---
+
 # M0 — MVP Plan
 
 ## Goal
@@ -15,29 +21,29 @@ No LLM polish yet. Just prove the core pipeline works end-to-end on macOS.
 - [x] README + LICENSE
 
 ### M0.2 — Audio Capture
-- [ ] Record audio from default microphone via `cpal`
-- [ ] Global hotkey to start/stop recording (Tauri global shortcut)
-- [ ] Audio saved as WAV in memory (not to disk)
-- [ ] Frontend overlay: recording indicator
-- [ ] **Verify**: unit test for audio buffer capture
+- [x] Record audio from default microphone via `cpal`
+- [x] Global hotkey to start/stop recording (Tauri global shortcut)
+- [x] Audio saved as WAV in memory (not to disk)
+- [x] Frontend overlay: recording indicator
+- [x] **Verify**: unit test for audio buffer capture
 
 ### M0.3 — STT Integration (Groq first)
-- [ ] `SttProvider` trait defined
-- [ ] `GroqWhisper` implementation (send WAV → get text)
-- [ ] Mock provider for CI tests
-- [ ] Config: API key via OS keychain
-- [ ] **Verify**: integration test with mock, manual test with real Groq key
+- [x] `SttProvider` trait defined
+- [x] `GroqWhisper` implementation (send WAV → get text)
+- [x] Mock provider for CI tests
+- [x] Config: API key via OS keychain
+- [x] **Verify**: integration test with mock, manual test with real Groq key
 
 ### M0.4 — Text Pasting
-- [ ] Paste transcribed text at cursor position
-- [ ] macOS: use accessibility API or clipboard + Cmd+V simulation
-- [ ] **Verify**: E2E — speak into mic, text appears in TextEdit
+- [x] Paste transcribed text at cursor position
+- [x] macOS: use accessibility API or clipboard + Cmd+V simulation
+- [x] **Verify**: E2E — speak into mic, text appears in TextEdit
 
 ### M0.5 — MVP Complete
-- [ ] Full loop works: hotkey → record → Groq STT → paste
-- [ ] Settings UI: configure API key, hotkey
-- [ ] History: last 10 transcriptions in SQLite
-- [ ] **Verify**: L2 E2E test documented with screenshot
+- [x] Full loop works: hotkey → record → Groq STT → paste
+- [x] Settings UI: configure API key, hotkey
+- [x] History: last 10 transcriptions in SQLite
+- [x] **Verify**: L2 E2E test documented with screenshot
 
 ## Non-goals for M0
 

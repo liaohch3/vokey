@@ -1,3 +1,9 @@
+---
+status: active
+priority: P0
+estimated_effort: L
+---
+
 # M1 — LLM Polish + Multi-Provider
 
 ## Goal

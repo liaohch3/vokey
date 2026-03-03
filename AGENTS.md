@@ -1,241 +1,89 @@
-# Vokey — Agent Instructions
+# AGENTS.md — Vokey
+
+This file is the **table of contents**, not the encyclopedia.
+Read it first, then follow pointers to deeper docs as needed.
 
 ## Project Identity
 
-Open-source, BYOK voice dictation for macOS (Windows later).  
-Tauri v2 + Rust backend + React/TypeScript frontend.  
+Open-source, BYOK voice dictation for macOS (Windows later).
+Tauri v2 + Rust backend + React/TypeScript frontend.
 Core loop: **hotkey → record → STT → LLM polish → paste at cursor**.
 
----
+## Non-negotiable Rules
 
-## Pre-commit CI checks
+1. **Gate checks before every commit** — see `docs/standards/validation-and-gates.md`
+2. **One concern per commit** — no mixed refactor + feature
+3. **English only** in code/comments/docs/commits (exception: `README_zh.md`)
+4. **Evidence required** for UI changes — screenshots in PR body
+5. **Pre-work checklist** before coding, **pre-PR checklist** before opening PR
+6. **Must push and open PR** — work isn't done until `gh pr create` runs
+7. **Plans are first-class** — complex work needs an execution plan in `docs/plans/`
 
-Before every `git commit`, run these checks locally (mirrors GitHub CI):
+## Standards Catalog
 
-```bash
-# Rust
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test
+| Standard | Location |
+|----------|----------|
+| Hard rules | `docs/standards/hard-rules.md` |
+| Validation gates | `docs/standards/validation-and-gates.md` |
+| Coding standards | `docs/standards/coding-standards.md` |
+| Architecture | `docs/standards/architecture.md` |
+| Auto-pilot workflow | `docs/standards/autopilot.md` |
 
-# Frontend
-cd frontend && npm run lint && npm run typecheck && npm test
-```
-
-All must pass before committing.
-
-## Pre-work Checklist
-
-Before any code change, run:
-
-```bash
-git diff --stat            # Check for uncommitted changes
-git log --oneline -10      # Understand recent history
-git fetch origin           # Get latest remote state
-```
-
-Ensure you are working on a clean, up-to-date branch.
-
----
-
-## Verification Loop (NON-NEGOTIABLE)
-
-Every feature must be verified end-to-end before merge. No exceptions.
-
-### Levels of verification
-
-| Level | What | When |
-|-------|------|------|
-| **L0 — Unit** | `cargo test` + `npm test` | Every commit |
-| **L1 — Integration** | Cross-layer tests (Rust↔Frontend via Tauri commands) | Every PR |
-| **L2 — E2E Manual** | Record voice → see text pasted in a real app | Every milestone feature |
-| **L3 — Regression** | Run full test suite + L2 on release branches | Every release |
-
-### E2E Validation Requirements
-
-For changes affecting: audio capture, STT pipeline, LLM processing, hotkey handling, or text pasting:
-
-1. Build the app: `cargo tauri dev`
-2. Test the full loop: press hotkey → speak → verify text appears at cursor
-3. Record evidence (screenshot or terminal output) in PR description
-4. Test with at least 2 STT providers (e.g., Groq + local Whisper)
-
-If E2E cannot run (e.g., no API key in CI), document the reason and residual risk in PR.
-
-### CI Pipeline
+## Architecture (quick map)
 
 ```
-lint (fmt + clippy + eslint) → unit tests → build check → integration tests
+frontend/src/          → React UI (pages, components, i18n)
+src-tauri/src/         → Rust backend
+  ├── audio.rs         → mic capture (cpal)
+  ├── commands.rs      → Tauri command handlers + pipeline orchestrator
+  ├── config.rs        → TOML config at ~/.vokey/config.toml
+  ├── paste.rs         → clipboard + Cmd+V simulation
+  ├── stt/             → STT provider trait + implementations
+  └── llm/             → LLM provider trait + implementations
+docs/
+  ├── design/          → product & UI design specs
+  ├── standards/       → engineering standards (this catalog)
+  └── plans/           → execution plans (active, completed, cancelled)
+scripts/               → CI, linting, automation scripts
+.agents/skills/        → agent skills (reusable task recipes)
 ```
 
-Integration tests use mock STT/LLM providers to avoid API key requirements in CI.
+## Config
 
----
+TOML at `~/.vokey/config.toml`. See `src-tauri/src/config.rs` for schema.
 
-## Language
-
-All code, comments, commit messages, docs, and skill files must be in English.
-Exception: Chinese-specific docs like `README_zh.md`.
-
----
-
-## Coding Standards
-
-### DO
-
-| Practice | Why |
-|----------|-----|
-| Delete dead code | Dead code misleads and rots |
-| Fix root cause of test failures | Patching symptoms creates fragile tests |
-| Use existing patterns | Consistency beats novelty |
-| Modify only relevant files | Minimize blast radius |
-| Keep functions focused | One function, one purpose |
-| Trust type invariants | Don't add redundant runtime checks for typed values |
-| Provider-agnostic interfaces | Every STT/LLM provider behind a trait/interface |
-| Test with mock providers | CI must never require real API keys |
-
-### DON'T
-
-| Anti-pattern | Why |
-|--------------|-----|
-| Leave commented-out code | Use version control, not comments |
-| Add speculative abstractions | YAGNI — wait until you need it |
-| Suppress linter warnings without justification | Fix or document false positives |
-| Commit generated files | Regenerate from source |
-| Mix refactoring with feature work | One concern per commit |
-| Hardcode provider-specific logic in core | Everything goes through traits |
-| Skip E2E for "trivial" changes | The pipeline is the product |
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│                  Frontend                    │
-│            React + TypeScript                │
-│  ┌─────────┐ ┌──────────┐ ┌──────────────┐ │
-│  │ Overlay  │ │ Settings │ │   History    │ │
-│  │ (record) │ │  (keys)  │ │  (SQLite)   │ │
-│  └────┬─────┘ └────┬─────┘ └──────┬──────┘ │
-│       │             │              │         │
-│       └─────────────┴──────────────┘         │
-│                     │ Tauri Commands          │
-├─────────────────────┴───────────────────────┤
-│                 Rust Backend                  │
-│  ┌──────────┐ ┌───────────┐ ┌────────────┐  │
-│  │  Audio   │ │    STT    │ │  LLM       │  │
-│  │ Capture  │ │ Provider  │ │ Provider   │  │
-│  │ (cpal)   │ │  (trait)  │ │  (trait)   │  │
-│  └────┬─────┘ └─────┬─────┘ └─────┬──────┘  │
-│       │              │             │          │
-│  ┌────┴──────────────┴─────────────┴───────┐ │
-│  │            Pipeline Orchestrator         │ │
-│  │  record → STT → polish → paste          │ │
-│  └──────────────────────────────────────────┘ │
-│  ┌──────────┐ ┌───────────┐ ┌────────────┐  │
-│  │ Hotkey   │ │  Config   │ │  Keychain  │  │
-│  │ Manager  │ │ (TOML)    │ │ (API keys) │  │
-│  └──────────┘ └───────────┘ └────────────┘  │
-└──────────────────────────────────────────────┘
-```
-
-### Key Traits
+## Key Traits
 
 ```rust
-trait SttProvider {
-    async fn transcribe(&self, audio: &[u8], config: &SttConfig) -> Result<String>;
+// STT — src-tauri/src/stt/mod.rs
+trait SttProvider: Send + Sync {
+    fn transcribe(&self, wav_data: &[u8]) -> Result<String, SttError>;
+    fn name(&self) -> &str;
 }
 
-trait LlmProvider {
-    async fn polish(&self, raw_text: &str, context: &PolishContext) -> Result<String>;
+// LLM — src-tauri/src/llm/mod.rs
+trait LlmProvider: Send + Sync {
+    fn polish(&self, raw_text: &str, system_prompt: &str) -> Result<String, LlmError>;
+    fn name(&self) -> &str;
 }
 ```
 
-Implementations:
-- **STT**: `GroqWhisper`, `OpenAiWhisper`, `GeminiAudio`, `LocalWhisper`
-- **LLM**: `OpenRouter`, `Groq`, `OpenAi`, `Gemini`, `Ollama`
+## Brain + Hands Protocol
 
-### Config
+- **Human / Claude Opus** = planning brain. Architecture, design, review decisions.
+- **Codex** = execution hands. Writes code, runs tests, opens PRs.
 
-TOML file at `~/.vokey/config.toml`:
-
-```toml
-[hotkey]
-trigger = "CmdOrCtrl+Shift+Space"
-
-[stt]
-provider = "groq"          # groq | openai | gemini | local
-# API keys stored in OS keychain, not config file
-
-[llm]
-provider = "openrouter"    # openrouter | groq | openai | gemini | ollama
-model = "anthropic/claude-haiku-4-5"
-
-[polish]
-default_prompt = "Clean up this dictation..."
-remove_fillers = true
-language = "auto"          # auto | zh | en | ...
-
-[polish.app_prompts]
-slack = "Casual, concise tone"
-email = "Professional, polished tone"
-code = "Convert to code comments or variable names"
-```
-
----
-
-## Worktree Workflow
-
-```bash
-git worktree add -b feat/<name> /tmp/vokey-<name> main
-cd /tmp/vokey-<name>
-# develop and test
-cd /path/to/vokey
-git merge --ff-only feat/<name>
-git worktree remove /tmp/vokey-<name>
-git branch -d feat/<name>
-```
-
----
+Never delegate architecture decisions to execution tools.
+Never hand-write code when Codex can do it.
 
 ## Compounding Engineering
 
 Record lessons learned:
+- Error experience: `docs/error-experience/YYYY-MM-DD-<slug>.md`
+- Good experience: `docs/good-experience/YYYY-MM-DD-<slug>.md`
 
-- **Error experience**: `docs/error-experience/YYYY-MM-DD-<slug>.md`
-- **Good experience**: `docs/good-experience/YYYY-MM-DD-<slug>.md`
-- **Plans**: `docs/plans/`
+## Auto-pilot
 
----
+See `docs/standards/autopilot.md` for the full self-iterating workflow.
 
-## Code Review
-
-Before every commit:
-
-1. `cargo fmt --check` + `cargo clippy` — Rust lint
-2. `npm run lint` + `npm run typecheck` — Frontend lint
-3. `cargo test` + `npm test` — Tests pass
-4. `git diff` — Review every changed line
-5. Verify scope: only relevant files modified
-
----
-
-## Brain + Hands Protocol
-
-- **Claude Code (Opus)** = planning brain. Architecture, API design, pattern decisions.
-- **Codex** = execution hands. Writes code, runs tests, applies changes.
-
-Never delegate architecture to execution tools.
-
----
-
-## Release Checklist
-
-- [ ] All L0 tests pass
-- [ ] L1 integration tests pass
-- [ ] L2 E2E manual test completed and documented
-- [ ] CHANGELOG.md updated
-- [ ] Version bumped in `Cargo.toml` and `package.json`
-- [ ] `cargo tauri build` produces working binary
-- [ ] Binary tested on clean macOS install (or VM)
+TL;DR: human submits requirement → Codex writes code + tests → agent reviews → PR opened → CI validates → human merges (or auto-merge if all checks pass).
