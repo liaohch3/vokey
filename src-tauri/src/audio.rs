@@ -259,6 +259,7 @@ mod tests {
     use super::AudioRecorder;
 
     #[test]
+    #[ignore = "requires hardware input device and can hang in headless environments"]
     fn audio_recorder_returns_valid_wav_header() {
         let mut recorder = AudioRecorder::default();
 

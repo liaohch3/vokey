@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod llm;
 mod paste;
+mod prompts;
 mod stt;
 
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -10,7 +11,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use audio::request_microphone_permission;
 use commands::{
     get_config, save_config, start_recording, stop_recording, stop_recording_and_transcribe,
-    toggle_recording, AppState,
+    stop_recording_and_transcribe_with_mode, toggle_recording, AppState,
 };
 
 fn default_shortcut() -> Shortcut {
@@ -48,7 +49,8 @@ pub fn run() {
             save_config,
             start_recording,
             stop_recording,
-            stop_recording_and_transcribe
+            stop_recording_and_transcribe,
+            stop_recording_and_transcribe_with_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

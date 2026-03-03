@@ -25,26 +25,54 @@ type HistoryItem = {
   polishedText: string
 }
 
+type SttProvider = 'groq' | 'openai' | 'deepgram' | 'siliconflow' | 'mock'
+type LlmProvider =
+  | 'gemini'
+  | 'openai'
+  | 'openrouter'
+  | 'deepseek'
+  | 'groq'
+  | 'moonshot'
+  | 'qwen'
+  | 'siliconflow'
+  | 'ollama'
+  | 'none'
+
+type SttProviderConfig = {
+  model: string
+  language: string | null
+}
+
+type OpenAiCompatibleConfig = {
+  model: string
+  base_url: string
+}
+
 type AppConfig = {
   stt: {
-    provider: 'groq' | 'mock'
+    provider: SttProvider
     api_key: string
-    groq: {
-      model: string
-      language: string | null
-    }
+    groq: SttProviderConfig
+    openai: SttProviderConfig
+    deepgram: SttProviderConfig
+    siliconflow: SttProviderConfig
   }
   llm: {
-    provider: 'gemini' | 'openai' | 'none'
+    provider: LlmProvider
     api_key: string
     system_prompt: string
+    target_lang: string
     gemini: {
       model: string
     }
-    openai: {
-      model: string
-      base_url: string
-    }
+    openai: OpenAiCompatibleConfig
+    openrouter: OpenAiCompatibleConfig
+    deepseek: OpenAiCompatibleConfig
+    groq: OpenAiCompatibleConfig
+    moonshot: OpenAiCompatibleConfig
+    qwen: OpenAiCompatibleConfig
+    siliconflow: OpenAiCompatibleConfig
+    ollama: OpenAiCompatibleConfig
   }
 }
 
@@ -52,6 +80,26 @@ type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFa
 
 const HISTORY_KEY = 'vokey.history.v1'
 const APP_VERSION = 'v0.1.0'
+const OPENAI_COMPATIBLE_LLM_PROVIDERS: LlmProvider[] = [
+  'openai',
+  'openrouter',
+  'deepseek',
+  'groq',
+  'moonshot',
+  'qwen',
+  'siliconflow',
+  'ollama',
+]
+const LLM_BASE_URL_PRESETS: Record<Exclude<LlmProvider, 'gemini' | 'none'>, string> = {
+  openai: 'https://api.openai.com',
+  openrouter: 'https://openrouter.ai/api/v1',
+  deepseek: 'https://api.deepseek.com',
+  groq: 'https://api.groq.com/openai',
+  moonshot: 'https://api.moonshot.cn',
+  qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  siliconflow: 'https://api.siliconflow.cn',
+  ollama: 'http://localhost:11434',
+}
 
 const defaultConfig = (): AppConfig => ({
   stt: {
@@ -61,17 +109,58 @@ const defaultConfig = (): AppConfig => ({
       model: 'whisper-large-v3-turbo',
       language: 'zh',
     },
+    openai: {
+      model: 'whisper-1',
+      language: null,
+    },
+    deepgram: {
+      model: 'nova-3',
+      language: 'en',
+    },
+    siliconflow: {
+      model: 'FunAudioLLM/SenseVoiceSmall',
+      language: 'zh',
+    },
   },
   llm: {
     provider: 'none',
     api_key: '',
     system_prompt: t('settings.defaultSystemPrompt'),
+    target_lang: 'English',
     gemini: {
       model: 'gemini-2.0-flash',
     },
     openai: {
       model: 'gpt-4o-mini',
       base_url: 'https://api.openai.com',
+    },
+    openrouter: {
+      model: 'openai/gpt-4o-mini',
+      base_url: 'https://openrouter.ai/api/v1',
+    },
+    deepseek: {
+      model: 'deepseek-chat',
+      base_url: 'https://api.deepseek.com',
+    },
+    groq: {
+      model: 'llama-3.3-70b-versatile',
+      base_url: 'https://api.groq.com/openai',
+    },
+    moonshot: {
+      model: 'moonshot-v1-8k',
+      base_url: 'https://api.moonshot.cn',
+    },
+    qwen: {
+      model: 'qwen-plus',
+      base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    },
+    siliconflow: {
+      model: 'Qwen/Qwen2.5-7B-Instruct',
+      base_url: 'https://api.siliconflow.cn',
+    },
+    ollama: {
+      model: 'qwen2.5:7b',
+      base_url: 'http://localhost:11434',
     },
   },
 })
@@ -90,17 +179,58 @@ const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined): AppCo
         model: incoming.stt?.groq?.model ?? fallback.stt.groq.model,
         language: incoming.stt?.groq?.language ?? fallback.stt.groq.language,
       },
+      openai: {
+        model: incoming.stt?.openai?.model ?? fallback.stt.openai.model,
+        language: incoming.stt?.openai?.language ?? fallback.stt.openai.language,
+      },
+      deepgram: {
+        model: incoming.stt?.deepgram?.model ?? fallback.stt.deepgram.model,
+        language: incoming.stt?.deepgram?.language ?? fallback.stt.deepgram.language,
+      },
+      siliconflow: {
+        model: incoming.stt?.siliconflow?.model ?? fallback.stt.siliconflow.model,
+        language: incoming.stt?.siliconflow?.language ?? fallback.stt.siliconflow.language,
+      },
     },
     llm: {
       provider: incoming.llm?.provider ?? fallback.llm.provider,
       api_key: incoming.llm?.api_key ?? fallback.llm.api_key,
       system_prompt: incoming.llm?.system_prompt ?? fallback.llm.system_prompt,
+      target_lang: incoming.llm?.target_lang ?? fallback.llm.target_lang,
       gemini: {
         model: incoming.llm?.gemini?.model ?? fallback.llm.gemini.model,
       },
       openai: {
         model: incoming.llm?.openai?.model ?? fallback.llm.openai.model,
         base_url: incoming.llm?.openai?.base_url ?? fallback.llm.openai.base_url,
+      },
+      openrouter: {
+        model: incoming.llm?.openrouter?.model ?? fallback.llm.openrouter.model,
+        base_url: incoming.llm?.openrouter?.base_url ?? fallback.llm.openrouter.base_url,
+      },
+      deepseek: {
+        model: incoming.llm?.deepseek?.model ?? fallback.llm.deepseek.model,
+        base_url: incoming.llm?.deepseek?.base_url ?? fallback.llm.deepseek.base_url,
+      },
+      groq: {
+        model: incoming.llm?.groq?.model ?? fallback.llm.groq.model,
+        base_url: incoming.llm?.groq?.base_url ?? fallback.llm.groq.base_url,
+      },
+      moonshot: {
+        model: incoming.llm?.moonshot?.model ?? fallback.llm.moonshot.model,
+        base_url: incoming.llm?.moonshot?.base_url ?? fallback.llm.moonshot.base_url,
+      },
+      qwen: {
+        model: incoming.llm?.qwen?.model ?? fallback.llm.qwen.model,
+        base_url: incoming.llm?.qwen?.base_url ?? fallback.llm.qwen.base_url,
+      },
+      siliconflow: {
+        model: incoming.llm?.siliconflow?.model ?? fallback.llm.siliconflow.model,
+        base_url: incoming.llm?.siliconflow?.base_url ?? fallback.llm.siliconflow.base_url,
+      },
+      ollama: {
+        model: incoming.llm?.ollama?.model ?? fallback.llm.ollama.model,
+        base_url: incoming.llm?.ollama?.base_url ?? fallback.llm.ollama.base_url,
       },
     },
   }
@@ -189,6 +319,80 @@ const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60)
   const remainder = seconds % 60
   return `${minutes}:${String(remainder).padStart(2, '0')}`
+}
+
+const getActiveSttConfig = (config: AppConfig): SttProviderConfig => {
+  switch (config.stt.provider) {
+    case 'openai':
+      return config.stt.openai
+    case 'deepgram':
+      return config.stt.deepgram
+    case 'siliconflow':
+      return config.stt.siliconflow
+    case 'groq':
+    case 'mock':
+    default:
+      return config.stt.groq
+  }
+}
+
+const setActiveSttConfig = (config: AppConfig, next: SttProviderConfig): AppConfig => {
+  switch (config.stt.provider) {
+    case 'openai':
+      return { ...config, stt: { ...config.stt, openai: next } }
+    case 'deepgram':
+      return { ...config, stt: { ...config.stt, deepgram: next } }
+    case 'siliconflow':
+      return { ...config, stt: { ...config.stt, siliconflow: next } }
+    case 'groq':
+    case 'mock':
+    default:
+      return { ...config, stt: { ...config.stt, groq: next } }
+  }
+}
+
+const getActiveLlmPreset = (config: AppConfig): OpenAiCompatibleConfig => {
+  switch (config.llm.provider) {
+    case 'openrouter':
+      return config.llm.openrouter
+    case 'deepseek':
+      return config.llm.deepseek
+    case 'groq':
+      return config.llm.groq
+    case 'moonshot':
+      return config.llm.moonshot
+    case 'qwen':
+      return config.llm.qwen
+    case 'siliconflow':
+      return config.llm.siliconflow
+    case 'ollama':
+      return config.llm.ollama
+    case 'openai':
+    default:
+      return config.llm.openai
+  }
+}
+
+const setActiveLlmPreset = (config: AppConfig, next: OpenAiCompatibleConfig): AppConfig => {
+  switch (config.llm.provider) {
+    case 'openrouter':
+      return { ...config, llm: { ...config.llm, openrouter: next } }
+    case 'deepseek':
+      return { ...config, llm: { ...config.llm, deepseek: next } }
+    case 'groq':
+      return { ...config, llm: { ...config.llm, groq: next } }
+    case 'moonshot':
+      return { ...config, llm: { ...config.llm, moonshot: next } }
+    case 'qwen':
+      return { ...config, llm: { ...config.llm, qwen: next } }
+    case 'siliconflow':
+      return { ...config, llm: { ...config.llm, siliconflow: next } }
+    case 'ollama':
+      return { ...config, llm: { ...config.llm, ollama: next } }
+    case 'openai':
+    default:
+      return { ...config, llm: { ...config.llm, openai: next } }
+  }
 }
 
 function App() {
@@ -436,6 +640,36 @@ function App() {
   const heroSubtext = pipelineStage === 'recording' ? formatDuration(recordingSeconds) : t('home.pressHotkey')
 
   const selectedLocale = LOCALES.find((entry) => entry.code === locale) ?? LOCALES[0]
+  const activeSttConfig = getActiveSttConfig(config)
+  const activeLlmPreset = getActiveLlmPreset(config)
+  const isOpenAiCompatibleProvider = OPENAI_COMPATIBLE_LLM_PROVIDERS.includes(config.llm.provider)
+
+  const selectLlmProvider = (provider: LlmProvider) => {
+    setConfig((prev) => {
+      const next = {
+        ...prev,
+        llm: {
+          ...prev.llm,
+          provider,
+        },
+      }
+
+      if (provider === 'gemini' || provider === 'none') {
+        return next
+      }
+
+      const preset = LLM_BASE_URL_PRESETS[provider]
+      const currentPreset = getActiveLlmPreset(next)
+      if (!currentPreset.base_url.trim()) {
+        return setActiveLlmPreset(next, {
+          ...currentPreset,
+          base_url: preset,
+        })
+      }
+
+      return next
+    })
+  }
 
   return (
     <div className="app-shell" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
@@ -662,6 +896,7 @@ function App() {
                 <div className="field-stack">
                   <div className="field-group">
                     <label>{t('settings.sttProvider')}</label>
+                    <p className="caption">{t('settings.sttProviderDescription')}</p>
                     <div className="segmented" role="group" aria-label={t('settings.sttProvider')}>
                       <button
                         type="button"
@@ -670,6 +905,30 @@ function App() {
                         disabled={isLoadingConfig}
                       >
                         {t('settings.sttProviderGroq')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.stt.provider === 'openai' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'openai' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.sttProviderOpenAi')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.stt.provider === 'deepgram' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'deepgram' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.sttProviderDeepgram')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.stt.provider === 'siliconflow' ? 'active' : ''}
+                        onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'siliconflow' } }))}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.sttProviderSiliconFlow')}
                       </button>
                       <button
                         type="button"
@@ -698,7 +957,7 @@ function App() {
                           }))
                         }
                         placeholder={t('settings.sttApiKeyPlaceholder')}
-                        disabled={isLoadingConfig}
+                        disabled={isLoadingConfig || config.stt.provider === 'mock'}
                       />
                       <button type="button" className="text-button" onClick={() => setShowSttKey((value) => !value)}>
                         {showSttKey ? t('settings.hideKey') : t('settings.showKey')}
@@ -709,40 +968,27 @@ function App() {
                   <div className="field-group">
                     <label>{t('settings.sttModel')}</label>
                     <input
-                      value={config.stt.groq.model}
+                      value={activeSttConfig.model}
                       onChange={(event) =>
-                        setConfig((prev) => ({
-                          ...prev,
-                          stt: {
-                            ...prev.stt,
-                            groq: {
-                              ...prev.stt.groq,
-                              model: event.target.value,
-                            },
-                          },
-                        }))
+                        setConfig((prev) => setActiveSttConfig(prev, { ...getActiveSttConfig(prev), model: event.target.value }))
                       }
-                      disabled={isLoadingConfig}
+                      disabled={isLoadingConfig || config.stt.provider === 'mock'}
                     />
                   </div>
 
                   <div className="field-group">
                     <label>{t('settings.primaryLanguage')}</label>
                     <select
-                      value={config.stt.groq.language ?? 'auto'}
+                      value={activeSttConfig.language ?? 'auto'}
                       onChange={(event) =>
-                        setConfig((prev) => ({
-                          ...prev,
-                          stt: {
-                            ...prev.stt,
-                            groq: {
-                              ...prev.stt.groq,
-                              language: event.target.value === 'auto' ? null : event.target.value,
-                            },
-                          },
-                        }))
+                        setConfig((prev) =>
+                          setActiveSttConfig(prev, {
+                            ...getActiveSttConfig(prev),
+                            language: event.target.value === 'auto' ? null : event.target.value,
+                          }),
+                        )
                       }
-                      disabled={isLoadingConfig}
+                      disabled={isLoadingConfig || config.stt.provider === 'mock'}
                     >
                       <option value="auto">{t('settings.languageAuto')}</option>
                       <option value="zh">{t('settings.languageChinese')}</option>
@@ -758,11 +1004,12 @@ function App() {
                 <div className="field-stack">
                   <div className="field-group">
                     <label>{t('settings.llmProvider')}</label>
+                    <p className="caption">{t('settings.llmProviderDescription')}</p>
                     <div className="segmented" role="group" aria-label={t('settings.llmProvider')}>
                       <button
                         type="button"
                         className={config.llm.provider === 'gemini' ? 'active' : ''}
-                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'gemini' } }))}
+                        onClick={() => selectLlmProvider('gemini')}
                         disabled={isLoadingConfig}
                       >
                         {t('settings.llmProviderGemini')}
@@ -770,15 +1017,71 @@ function App() {
                       <button
                         type="button"
                         className={config.llm.provider === 'openai' ? 'active' : ''}
-                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'openai' } }))}
+                        onClick={() => selectLlmProvider('openai')}
                         disabled={isLoadingConfig}
                       >
-                        {t('settings.llmProviderOpenAiCompatible')}
+                        {t('settings.llmProviderOpenAi')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'openrouter' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('openrouter')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderOpenRouter')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'deepseek' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('deepseek')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderDeepSeek')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'groq' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('groq')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderGroq')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'moonshot' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('moonshot')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderMoonshot')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'qwen' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('qwen')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderQwen')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'siliconflow' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('siliconflow')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderSiliconFlow')}
+                      </button>
+                      <button
+                        type="button"
+                        className={config.llm.provider === 'ollama' ? 'active' : ''}
+                        onClick={() => selectLlmProvider('ollama')}
+                        disabled={isLoadingConfig}
+                      >
+                        {t('settings.llmProviderOllama')}
                       </button>
                       <button
                         type="button"
                         className={config.llm.provider === 'none' ? 'active' : ''}
-                        onClick={() => setConfig((prev) => ({ ...prev, llm: { ...prev.llm, provider: 'none' } }))}
+                        onClick={() => selectLlmProvider('none')}
                         disabled={isLoadingConfig}
                       >
                         {t('settings.llmProviderNone')}
@@ -834,23 +1137,16 @@ function App() {
                     </div>
                   )}
 
-                  {config.llm.provider === 'openai' && (
+                  {isOpenAiCompatibleProvider && (
                     <>
                       <div className="field-group">
                         <label>{t('settings.llmModel')}</label>
                         <input
-                          value={config.llm.openai.model}
+                          value={activeLlmPreset.model}
                           onChange={(event) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              llm: {
-                                ...prev.llm,
-                                openai: {
-                                  ...prev.llm.openai,
-                                  model: event.target.value,
-                                },
-                              },
-                            }))
+                            setConfig((prev) =>
+                              setActiveLlmPreset(prev, { ...getActiveLlmPreset(prev), model: event.target.value }),
+                            )
                           }
                           disabled={isLoadingConfig}
                         />
@@ -859,18 +1155,11 @@ function App() {
                       <div className="field-group">
                         <label>{t('settings.llmBaseUrl')}</label>
                         <input
-                          value={config.llm.openai.base_url}
+                          value={activeLlmPreset.base_url}
                           onChange={(event) =>
-                            setConfig((prev) => ({
-                              ...prev,
-                              llm: {
-                                ...prev.llm,
-                                openai: {
-                                  ...prev.llm.openai,
-                                  base_url: event.target.value,
-                                },
-                              },
-                            }))
+                            setConfig((prev) =>
+                              setActiveLlmPreset(prev, { ...getActiveLlmPreset(prev), base_url: event.target.value }),
+                            )
                           }
                           placeholder={t('settings.llmBaseUrlPlaceholder')}
                           disabled={isLoadingConfig}

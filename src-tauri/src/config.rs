@@ -5,10 +5,30 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_STT_MODEL: &str = "whisper-large-v3-turbo";
+const DEFAULT_OPENAI_STT_MODEL: &str = "whisper-1";
+const DEFAULT_DEEPGRAM_MODEL: &str = "nova-3";
+const DEFAULT_SILICONFLOW_STT_MODEL: &str = "FunAudioLLM/SenseVoiceSmall";
+
 const DEFAULT_LLM_SYSTEM_PROMPT: &str = "You are a dictation assistant. Clean up the following speech-to-text transcription: fix grammar, remove filler words, improve punctuation. Keep the original meaning and language. Return only the polished text, no explanation.";
+const DEFAULT_TARGET_LANG: &str = "English";
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.0-flash";
+
 const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com";
+const DEFAULT_OPENROUTER_MODEL: &str = "openai/gpt-4o-mini";
+const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
+const DEFAULT_DEEPSEEK_MODEL: &str = "deepseek-chat";
+const DEFAULT_DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+const DEFAULT_GROQ_MODEL: &str = "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_BASE_URL: &str = "https://api.groq.com/openai";
+const DEFAULT_MOONSHOT_MODEL: &str = "moonshot-v1-8k";
+const DEFAULT_MOONSHOT_BASE_URL: &str = "https://api.moonshot.cn";
+const DEFAULT_QWEN_MODEL: &str = "qwen-plus";
+const DEFAULT_QWEN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const DEFAULT_SILICONFLOW_LLM_MODEL: &str = "Qwen/Qwen2.5-7B-Instruct";
+const DEFAULT_SILICONFLOW_LLM_BASE_URL: &str = "https://api.siliconflow.cn";
+const DEFAULT_OLLAMA_MODEL: &str = "qwen2.5:7b";
+const DEFAULT_OLLAMA_BASE_URL: &str = "http://localhost:11434";
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -45,12 +65,17 @@ pub struct SttConfig {
     #[serde(default)]
     pub api_key: String,
     #[serde(default)]
-    pub groq: GroqConfig,
+    pub groq: SttProviderConfig,
+    #[serde(default)]
+    pub openai: SttProviderConfig,
+    #[serde(default)]
+    pub deepgram: SttProviderConfig,
+    #[serde(default)]
+    pub siliconflow: SttProviderConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct GroqConfig {
-    #[serde(default = "default_stt_model")]
+pub struct SttProviderConfig {
     pub model: String,
     #[serde(default)]
     pub language: Option<String>,
@@ -63,10 +88,26 @@ pub struct LlmConfig {
     pub api_key: String,
     #[serde(default = "default_llm_system_prompt")]
     pub system_prompt: String,
+    #[serde(default = "default_target_lang")]
+    pub target_lang: String,
     #[serde(default)]
     pub gemini: GeminiConfig,
     #[serde(default)]
     pub openai: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub openrouter: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub deepseek: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub groq: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub moonshot: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub qwen: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub siliconflow: OpenAiCompatibleConfig,
+    #[serde(default)]
+    pub ollama: OpenAiCompatibleConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -77,9 +118,7 @@ pub struct GeminiConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OpenAiCompatibleConfig {
-    #[serde(default = "default_openai_model")]
     pub model: String,
-    #[serde(default = "default_openai_base_url")]
     pub base_url: String,
 }
 
@@ -88,17 +127,47 @@ impl Default for SttConfig {
         Self {
             provider: "groq".to_string(),
             api_key: String::new(),
-            groq: GroqConfig::default(),
+            groq: SttProviderConfig::groq_default(),
+            openai: SttProviderConfig::openai_default(),
+            deepgram: SttProviderConfig::deepgram_default(),
+            siliconflow: SttProviderConfig::siliconflow_default(),
         }
     }
 }
 
-impl Default for GroqConfig {
-    fn default() -> Self {
+impl SttProviderConfig {
+    fn groq_default() -> Self {
         Self {
-            model: default_stt_model(),
+            model: DEFAULT_STT_MODEL.to_string(),
             language: Some("zh".to_string()),
         }
+    }
+
+    fn openai_default() -> Self {
+        Self {
+            model: DEFAULT_OPENAI_STT_MODEL.to_string(),
+            language: None,
+        }
+    }
+
+    fn deepgram_default() -> Self {
+        Self {
+            model: DEFAULT_DEEPGRAM_MODEL.to_string(),
+            language: Some("en".to_string()),
+        }
+    }
+
+    fn siliconflow_default() -> Self {
+        Self {
+            model: DEFAULT_SILICONFLOW_STT_MODEL.to_string(),
+            language: Some("zh".to_string()),
+        }
+    }
+}
+
+impl Default for SttProviderConfig {
+    fn default() -> Self {
+        SttProviderConfig::groq_default()
     }
 }
 
@@ -108,8 +177,16 @@ impl Default for LlmConfig {
             provider: "none".to_string(),
             api_key: String::new(),
             system_prompt: default_llm_system_prompt(),
+            target_lang: default_target_lang(),
             gemini: GeminiConfig::default(),
-            openai: OpenAiCompatibleConfig::default(),
+            openai: OpenAiCompatibleConfig::openai_default(),
+            openrouter: OpenAiCompatibleConfig::openrouter_default(),
+            deepseek: OpenAiCompatibleConfig::deepseek_default(),
+            groq: OpenAiCompatibleConfig::groq_default(),
+            moonshot: OpenAiCompatibleConfig::moonshot_default(),
+            qwen: OpenAiCompatibleConfig::qwen_default(),
+            siliconflow: OpenAiCompatibleConfig::siliconflow_default(),
+            ollama: OpenAiCompatibleConfig::ollama_default(),
         }
     }
 }
@@ -122,33 +199,80 @@ impl Default for GeminiConfig {
     }
 }
 
-impl Default for OpenAiCompatibleConfig {
-    fn default() -> Self {
+impl OpenAiCompatibleConfig {
+    fn openai_default() -> Self {
         Self {
-            model: default_openai_model(),
-            base_url: default_openai_base_url(),
+            model: DEFAULT_OPENAI_MODEL.to_string(),
+            base_url: DEFAULT_OPENAI_BASE_URL.to_string(),
+        }
+    }
+
+    fn openrouter_default() -> Self {
+        Self {
+            model: DEFAULT_OPENROUTER_MODEL.to_string(),
+            base_url: DEFAULT_OPENROUTER_BASE_URL.to_string(),
+        }
+    }
+
+    fn deepseek_default() -> Self {
+        Self {
+            model: DEFAULT_DEEPSEEK_MODEL.to_string(),
+            base_url: DEFAULT_DEEPSEEK_BASE_URL.to_string(),
+        }
+    }
+
+    fn groq_default() -> Self {
+        Self {
+            model: DEFAULT_GROQ_MODEL.to_string(),
+            base_url: DEFAULT_GROQ_BASE_URL.to_string(),
+        }
+    }
+
+    fn moonshot_default() -> Self {
+        Self {
+            model: DEFAULT_MOONSHOT_MODEL.to_string(),
+            base_url: DEFAULT_MOONSHOT_BASE_URL.to_string(),
+        }
+    }
+
+    fn qwen_default() -> Self {
+        Self {
+            model: DEFAULT_QWEN_MODEL.to_string(),
+            base_url: DEFAULT_QWEN_BASE_URL.to_string(),
+        }
+    }
+
+    fn siliconflow_default() -> Self {
+        Self {
+            model: DEFAULT_SILICONFLOW_LLM_MODEL.to_string(),
+            base_url: DEFAULT_SILICONFLOW_LLM_BASE_URL.to_string(),
+        }
+    }
+
+    fn ollama_default() -> Self {
+        Self {
+            model: DEFAULT_OLLAMA_MODEL.to_string(),
+            base_url: DEFAULT_OLLAMA_BASE_URL.to_string(),
         }
     }
 }
 
-fn default_stt_model() -> String {
-    DEFAULT_STT_MODEL.to_string()
+impl Default for OpenAiCompatibleConfig {
+    fn default() -> Self {
+        OpenAiCompatibleConfig::openai_default()
+    }
 }
 
 fn default_llm_system_prompt() -> String {
     DEFAULT_LLM_SYSTEM_PROMPT.to_string()
 }
 
+fn default_target_lang() -> String {
+    DEFAULT_TARGET_LANG.to_string()
+}
+
 fn default_gemini_model() -> String {
     DEFAULT_GEMINI_MODEL.to_string()
-}
-
-fn default_openai_model() -> String {
-    DEFAULT_OPENAI_MODEL.to_string()
-}
-
-fn default_openai_base_url() -> String {
-    DEFAULT_OPENAI_BASE_URL.to_string()
 }
 
 pub fn load_or_create_config() -> Result<AppConfig, ConfigError> {
