@@ -28,6 +28,8 @@
 | 编码规范 | `docs/standards/coding-standards.md` |
 | 架构 | `docs/standards/architecture.md` |
 | Auto-pilot 工作流 | `docs/standards/autopilot.md` |
+| 调试标准 | `docs/standards/debugging-standards.md` |
+| 截图标准 | `docs/standards/screenshot-standards.md` |
 
 ## 架构速览
 

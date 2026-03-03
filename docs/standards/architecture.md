@@ -58,6 +58,8 @@ expected_paths:
   - 'docs/standards/coding-standards.md'
   - 'docs/standards/architecture.md'
   - 'docs/standards/autopilot.md'
+  - 'docs/standards/debugging-standards.md'
+  - 'docs/standards/screenshot-standards.md'
   - 'src-tauri/src/lib.rs'
   - 'src-tauri/src/commands.rs'
   - 'src-tauri/src/config.rs'
