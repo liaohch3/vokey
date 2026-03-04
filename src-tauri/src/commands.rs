@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::thread;
 
 use base64::Engine;
@@ -19,6 +20,7 @@ enum AudioRequest {
 
 pub struct AppState {
     audio_tx: mpsc::Sender<AudioRequest>,
+    active_mode: Mutex<Option<VoiceMode>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,7 +63,10 @@ impl AppState {
             }
         });
 
-        Self { audio_tx }
+        Self {
+            audio_tx,
+            active_mode: Mutex::new(None),
+        }
     }
 
     fn start_recording(&self) -> Result<(), AudioError> {
@@ -78,6 +83,19 @@ impl AppState {
             .send(AudioRequest::Stop(response_tx))
             .map_err(|_| AudioError::NotRecording)?;
         response_rx.recv().map_err(|_| AudioError::NotRecording)?
+    }
+
+    fn set_active_mode(&self, mode: VoiceMode) {
+        if let Ok(mut active_mode) = self.active_mode.lock() {
+            *active_mode = Some(mode);
+        }
+    }
+
+    fn take_active_mode_or(&self, fallback: VoiceMode) -> VoiceMode {
+        match self.active_mode.lock() {
+            Ok(mut active_mode) => active_mode.take().unwrap_or(fallback),
+            Err(_) => fallback,
+        }
     }
 }
 
@@ -159,11 +177,12 @@ fn stop_recording_and_transcribe_by_mode(
     })
 }
 
-pub fn toggle_recording(app: &AppHandle) {
+pub fn toggle_recording(app: &AppHandle, mode: VoiceMode) {
     let state = app.state::<AppState>();
 
     match state.start_recording() {
         Ok(()) => {
+            state.set_active_mode(mode);
             if let Err(err) = app.emit("recording-state-changed", true) {
                 log::error!("failed to emit recording-state-changed event: {err}");
             }
@@ -171,13 +190,14 @@ pub fn toggle_recording(app: &AppHandle) {
         }
         Err(AudioError::AlreadyRecording) => match state.stop_recording() {
             Ok(wav) => {
+                let active_mode = state.take_active_mode_or(mode);
                 if let Err(err) = app.emit("recording-state-changed", false) {
                     log::error!("failed to emit recording-state-changed event: {err}");
                 }
 
                 let app_handle = app.clone();
                 thread::spawn(move || {
-                    run_transcribe_and_paste_pipeline(app_handle, wav, VoiceMode::Dictation);
+                    run_transcribe_and_paste_pipeline(app_handle, wav, active_mode);
                 });
             }
             Err(err) => {

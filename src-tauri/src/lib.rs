@@ -11,11 +11,19 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use audio::request_microphone_permission;
 use commands::{
     get_config, save_config, start_recording, stop_recording, stop_recording_and_transcribe,
-    stop_recording_and_transcribe_with_mode, toggle_recording, AppState,
+    stop_recording_and_transcribe_with_mode, toggle_recording, AppState, VoiceMode,
 };
 
-fn default_shortcut() -> Shortcut {
+fn dictation_shortcut() -> Shortcut {
     Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space)
+}
+
+fn ask_anything_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyA)
+}
+
+fn translation_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,8 +33,16 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if shortcut == &default_shortcut() && event.state() == ShortcutState::Pressed {
-                        toggle_recording(app);
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+
+                    if shortcut == &dictation_shortcut() {
+                        toggle_recording(app, VoiceMode::Dictation);
+                    } else if shortcut == &ask_anything_shortcut() {
+                        toggle_recording(app, VoiceMode::AskAnything);
+                    } else if shortcut == &translation_shortcut() {
+                        toggle_recording(app, VoiceMode::Translation);
                     }
                 })
                 .build(),
@@ -41,7 +57,9 @@ pub fn run() {
             }
 
             request_microphone_permission();
-            app.global_shortcut().register(default_shortcut())?;
+            app.global_shortcut().register(dictation_shortcut())?;
+            app.global_shortcut().register(ask_anything_shortcut())?;
+            app.global_shortcut().register(translation_shortcut())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

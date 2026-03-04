@@ -74,8 +74,16 @@ export function Settings({
       <h2>{t('settings.general')}</h2>
       <div className="field-stack">
         <div className="field-row">
-          <label>{t('settings.shortcut')}</label>
-          <span className="badge">{t('settings.shortcutValue')}</span>
+          <label>{t('settings.shortcutDictationLabel')}</label>
+          <span className="badge">{t('settings.shortcutDictationValue')}</span>
+        </div>
+        <div className="field-row">
+          <label>{t('settings.shortcutAskLabel')}</label>
+          <span className="badge">{t('settings.shortcutAskValue')}</span>
+        </div>
+        <div className="field-row">
+          <label>{t('settings.shortcutTranslateLabel')}</label>
+          <span className="badge">{t('settings.shortcutTranslateValue')}</span>
         </div>
         <p className="caption">{t('settings.generalDescription')}</p>
       </div>
