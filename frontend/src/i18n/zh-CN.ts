@@ -44,6 +44,7 @@ export const zhCN: Translations = {
   'settings.sttProviderDescription': '选择语音转文字后端并配置模型/语言。',
   'settings.sttProviderGroq': 'Groq',
   'settings.sttProviderOpenAi': 'OpenAI Whisper',
+  'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
   'settings.sttProviderMock': '模拟',

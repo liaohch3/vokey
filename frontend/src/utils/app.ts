@@ -32,6 +32,7 @@ export const defaultConfig = (): AppConfig => ({
     api_key: '',
     groq: { model: 'whisper-large-v3-turbo', language: 'zh' },
     openai: { model: 'whisper-1', language: null },
+    openrouter: { model: 'openai/whisper-large-v3', language: null },
     deepgram: { model: 'nova-3', language: 'en' },
     siliconflow: { model: 'FunAudioLLM/SenseVoiceSmall', language: 'zh' },
   },
@@ -69,6 +70,10 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
       openai: {
         model: incoming.stt?.openai?.model ?? fallback.stt.openai.model,
         language: incoming.stt?.openai?.language ?? fallback.stt.openai.language,
+      },
+      openrouter: {
+        model: incoming.stt?.openrouter?.model ?? fallback.stt.openrouter.model,
+        language: incoming.stt?.openrouter?.language ?? fallback.stt.openrouter.language,
       },
       deepgram: {
         model: incoming.stt?.deepgram?.model ?? fallback.stt.deepgram.model,
@@ -210,6 +215,8 @@ export const getActiveSttConfig = (config: AppConfig): SttProviderConfig => {
   switch (config.stt.provider) {
     case 'openai':
       return config.stt.openai
+    case 'openrouter':
+      return config.stt.openrouter
     case 'deepgram':
       return config.stt.deepgram
     case 'siliconflow':
@@ -225,6 +232,8 @@ export const setActiveSttConfig = (config: AppConfig, next: SttProviderConfig): 
   switch (config.stt.provider) {
     case 'openai':
       return { ...config, stt: { ...config.stt, openai: next } }
+    case 'openrouter':
+      return { ...config, stt: { ...config.stt, openrouter: next } }
     case 'deepgram':
       return { ...config, stt: { ...config.stt, deepgram: next } }
     case 'siliconflow':

@@ -2,6 +2,7 @@ mod deepgram;
 mod groq;
 pub mod mock;
 mod openai;
+mod openrouter;
 mod siliconflow;
 
 use std::fmt;
@@ -10,6 +11,7 @@ use crate::config::SttConfig;
 use deepgram::DeepgramProvider;
 use groq::GroqWhisperProvider;
 use openai::OpenAiWhisperProvider;
+use openrouter::OpenRouterWhisperProvider;
 use siliconflow::SiliconFlowWhisperProvider;
 
 pub trait SttProvider: Send + Sync {
@@ -64,6 +66,16 @@ pub fn create_provider(config: &SttConfig) -> Result<Box<dyn SttProvider>, SttEr
                 config.openai.language.clone(),
             )))
         }
+        "openrouter" => {
+            if config.api_key.trim().is_empty() {
+                return Err(SttError::MissingApiKey);
+            }
+            Ok(Box::new(OpenRouterWhisperProvider::new(
+                config.api_key.clone(),
+                config.openrouter.model.clone(),
+                config.openrouter.language.clone(),
+            )))
+        }
         "deepgram" => {
             if config.api_key.trim().is_empty() {
                 return Err(SttError::MissingApiKey);
@@ -101,6 +113,7 @@ mod tests {
         };
         config.groq.language = Some("en".to_string());
         config.openai.language = Some("en".to_string());
+        config.openrouter.language = Some("en".to_string());
         config.deepgram.language = Some("en".to_string());
         config.siliconflow.language = Some("en".to_string());
         config
@@ -117,6 +130,13 @@ mod tests {
         let provider =
             create_provider(&base_config("deepgram")).expect("provider should be created");
         assert_eq!(provider.name(), "deepgram");
+    }
+
+    #[test]
+    fn create_provider_routes_to_openrouter() {
+        let provider =
+            create_provider(&base_config("openrouter")).expect("provider should be created");
+        assert_eq!(provider.name(), "openrouter");
     }
 
     #[test]

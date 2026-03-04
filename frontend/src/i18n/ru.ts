@@ -44,6 +44,7 @@ export const ru: Translations = {
   'settings.sttProviderDescription': 'Choose a speech-to-text backend and configure model/language.',
   'settings.sttProviderGroq': 'Groq',
   'settings.sttProviderOpenAi': 'OpenAI Whisper',
+  'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
   'settings.sttProviderMock': 'Мок',
