@@ -33,3 +33,4 @@ tauri-plugin-log = "2"
 arboard = "3"
 core-graphics = "0.24"
 core-graphics-types = "0.2"
+rusqlite = { version = "0.32", features = ["bundled"] }

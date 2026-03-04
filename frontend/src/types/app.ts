@@ -15,8 +15,33 @@ export type PipelineStatusPayload = {
 export type HistoryItem = {
   id: string
   timestamp: string
+  mode: string
   rawText: string
   polishedText: string
+  sttProvider: string
+  llmProvider: string
+  durationMs: number
+}
+
+export type BackendHistoryEntry = {
+  id: number
+  timestamp: string
+  mode: string
+  raw_text: string
+  polished_text: string
+  stt_provider: string
+  llm_provider: string
+  duration_ms: number
+}
+
+export type NewHistoryEntry = {
+  timestamp: string
+  mode: string
+  raw_text: string
+  polished_text: string
+  stt_provider: string
+  llm_provider: string
+  duration_ms: number
 }
 
 export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow'

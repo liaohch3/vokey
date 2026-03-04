@@ -9,6 +9,11 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::audio::{AudioError, AudioRecorder};
 use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
 use crate::dictionary::{load_dictionary_text, parse_dictionary_terms, save_dictionary_text};
+use crate::history::{
+    clear_history as clear_history_db, delete_entry as delete_history_entry_db,
+    get_history as get_history_db, import_legacy_history, insert_history, HistoryEntry,
+    LegacyHistoryEntry, NewHistoryEntry,
+};
 use crate::llm::create_provider as create_llm_provider;
 use crate::paste::{copy_to_clipboard, paste_text};
 use crate::prompts::system_prompt_for_mode;
@@ -118,6 +123,31 @@ pub fn load_dictionary() -> Result<String, String> {
 #[tauri::command]
 pub fn save_dictionary(content: String) -> Result<(), String> {
     save_dictionary_text(&content).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn get_history() -> Result<Vec<HistoryEntry>, String> {
+    get_history_db().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn add_history_entry(entry: NewHistoryEntry) -> Result<i64, String> {
+    insert_history(&entry).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn clear_history() -> Result<(), String> {
+    clear_history_db().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn delete_entry(id: i64) -> Result<(), String> {
+    delete_history_entry_db(id).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn import_legacy_history_entries(entries: Vec<LegacyHistoryEntry>) -> Result<usize, String> {
+    import_legacy_history(&entries).map_err(|err| err.to_string())
 }
 
 #[tauri::command]

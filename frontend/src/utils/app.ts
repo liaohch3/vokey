@@ -1,5 +1,12 @@
 import { t, type Locale } from '../i18n'
-import type { AppConfig, HistoryItem, LlmProvider, OpenAiCompatibleConfig, SttProviderConfig } from '../types/app'
+import type {
+  AppConfig,
+  BackendHistoryEntry,
+  HistoryItem,
+  LlmProvider,
+  OpenAiCompatibleConfig,
+  SttProviderConfig,
+} from '../types/app'
 
 export const HISTORY_KEY = 'vokey.history.v1'
 export const APP_VERSION = 'v0.1.0'
@@ -139,7 +146,7 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
   }
 }
 
-export const loadHistory = (): HistoryItem[] => {
+export const loadLegacyHistory = (): HistoryItem[] => {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (!raw) {
@@ -160,6 +167,21 @@ export const loadHistory = (): HistoryItem[] => {
 export const saveHistory = (items: HistoryItem[]) => {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
 }
+
+export const clearLegacyHistory = () => {
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+export const fromBackendHistory = (entry: BackendHistoryEntry): HistoryItem => ({
+  id: String(entry.id),
+  timestamp: entry.timestamp,
+  mode: entry.mode,
+  rawText: entry.raw_text,
+  polishedText: entry.polished_text,
+  sttProvider: entry.stt_provider,
+  llmProvider: entry.llm_provider,
+  durationMs: entry.duration_ms,
+})
 
 export const getLocaleFlag = (code: Locale): string => {
   switch (code) {

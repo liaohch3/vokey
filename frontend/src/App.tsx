@@ -13,8 +13,17 @@ import { Sidebar } from './components/Sidebar'
 import { History } from './pages/History'
 import { Home } from './pages/Home'
 import { Settings } from './pages/Settings'
-import type { AppConfig, HistoryItem, Page, PipelineStatusPayload, SettingsStatusKey, TranscriptionResult } from './types/app'
-import { defaultConfig, loadHistory, normalizeConfig, saveHistory } from './utils/app'
+import type {
+  AppConfig,
+  BackendHistoryEntry,
+  HistoryItem,
+  NewHistoryEntry,
+  Page,
+  PipelineStatusPayload,
+  SettingsStatusKey,
+  TranscriptionResult,
+} from './types/app'
+import { clearLegacyHistory, defaultConfig, fromBackendHistory, loadLegacyHistory, normalizeConfig } from './utils/app'
 
 function App() {
   const { locale, setLocale } = useLocale()
@@ -24,7 +33,7 @@ function App() {
   const [pipelineStage, setPipelineStage] = useState('idle')
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null)
-  const [history, setHistory] = useState<HistoryItem[]>(() => loadHistory())
+  const [history, setHistory] = useState<HistoryItem[]>([])
   const [config, setConfig] = useState<AppConfig>(defaultConfig)
   const [isLoadingConfig, setIsLoadingConfig] = useState(true)
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatusKey | null>(null)
@@ -64,6 +73,22 @@ function App() {
         if (mounted) setConfig(normalizeConfig(loaded))
         const loadedDictionary = await invoke<string>('load_dictionary')
         if (mounted) setDictionaryText(loadedDictionary)
+        let dbHistory = await invoke<BackendHistoryEntry[]>('get_history')
+        if (dbHistory.length === 0) {
+          const legacy = loadLegacyHistory()
+          if (legacy.length > 0) {
+            await invoke<number>('import_legacy_history_entries', {
+              entries: legacy.map((entry) => ({
+                timestamp: entry.timestamp,
+                raw_text: entry.rawText,
+                polished_text: entry.polishedText,
+              })),
+            })
+            clearLegacyHistory()
+            dbHistory = await invoke<BackendHistoryEntry[]>('get_history')
+          }
+        }
+        if (mounted) setHistory(dbHistory.map(fromBackendHistory))
       } catch (err) {
         if (mounted) setError(`${t('error.failedLoadConfig')}: ${String(err)}`)
       } finally {
@@ -116,9 +141,19 @@ function App() {
     try {
       const result = await invoke<TranscriptionResult>('stop_recording_and_transcribe')
       setLastResult(result)
-      const nextItem: HistoryItem = { id: `${Date.now()}`, timestamp: new Date().toISOString(), rawText: result.raw_text, polishedText: result.polished_text }
-      const nextHistory = [nextItem, ...history].slice(0, 100)
-      setHistory(nextHistory); saveHistory(nextHistory); setPipelineStage('done'); setDoneFlash(true)
+      const newEntry: NewHistoryEntry = {
+        timestamp: new Date().toISOString(),
+        mode: 'dictation',
+        raw_text: result.raw_text,
+        polished_text: result.polished_text,
+        stt_provider: config.stt.provider,
+        llm_provider: config.llm.provider,
+        duration_ms: recordingSeconds * 1000,
+      }
+      await invoke<number>('add_history_entry', { entry: newEntry })
+      const dbHistory = await invoke<BackendHistoryEntry[]>('get_history')
+      setHistory(dbHistory.map(fromBackendHistory))
+      setPipelineStage('done'); setDoneFlash(true)
       window.setTimeout(() => { setDoneFlash(false); setPipelineStage('idle') }, 900)
     } catch (err) {
       setPipelineStage('error'); setMicErrorShake(true); setError(String(err)); window.setTimeout(() => setMicErrorShake(false), 400)
@@ -142,7 +177,11 @@ function App() {
       setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
     }
   }
-  const clearHistory = () => { setHistory([]); setLastResult(null); saveHistory([]) }
+  const clearHistory = async () => {
+    await invoke('clear_history')
+    setHistory([])
+    setLastResult(null)
+  }
   const copyHistoryText = async (id: string, value: string) => {
     try { await navigator.clipboard.writeText(value); setCopySuccessId(id); window.setTimeout(() => setCopySuccessId(null), 1200) } catch { setError(t('status.error')) }
   }
