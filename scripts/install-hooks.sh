@@ -49,6 +49,50 @@ fi
 HOOK
 chmod +x "$HOOK_DIR/prepare-commit-msg"
 
+# pre-push: validate PR body if pushing a non-main branch with an open PR
+cat > "$HOOK_DIR/pre-push" << 'HOOK'
+#!/bin/sh
+set -eu
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+
+# Skip for main branch
+if [ "$branch" = "main" ] || [ -z "$branch" ]; then
+  exit 0
+fi
+
+# Check if gh CLI is available
+if ! command -v gh >/dev/null 2>&1; then
+  exit 0
+fi
+
+# Check if there's an open PR for this branch
+pr_body=$(gh pr view "$branch" --json body -q ".body" 2>/dev/null || true)
+
+if [ -z "$pr_body" ]; then
+  # No PR yet — skip (will be checked when PR is created)
+  exit 0
+fi
+
+echo "🔍 Checking PR body quality for branch '$branch'..."
+
+# Write body to temp file and validate
+tmpfile=$(mktemp)
+echo "$pr_body" > "$tmpfile"
+python3 scripts/check_pr_body.py --file "$tmpfile"
+result=$?
+rm -f "$tmpfile"
+
+if [ $result -ne 0 ]; then
+  echo ""
+  echo "💡 Fix the PR body on GitHub, then push again."
+  echo "   Required sections: ## 做了什么 / ## 为什么 / ## 改动详情 / ## 检查清单"
+  exit 1
+fi
+HOOK
+chmod +x "$HOOK_DIR/pre-push"
+
 echo "✅ Git hooks installed:"
 echo "   - pre-commit (lint check)"
 echo "   - prepare-commit-msg (format reminder)"
+echo "   - pre-push (PR body quality check)"

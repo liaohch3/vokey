@@ -83,7 +83,18 @@ def has_screenshots(body: str) -> bool:
 
 
 def main():
-    body = get_pr_body()
+    # --file mode: validate a local markdown file (for pre-push / local use)
+    if len(sys.argv) >= 3 and sys.argv[1] == "--file":
+        filepath = sys.argv[2]
+        try:
+            with open(filepath) as f:
+                body = f.read()
+        except FileNotFoundError:
+            print(f"❌ File not found: {filepath}")
+            sys.exit(1)
+    else:
+        body = get_pr_body()
+
     if not body:
         print("❌ Could not retrieve PR body")
         sys.exit(1)
