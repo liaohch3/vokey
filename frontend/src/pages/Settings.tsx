@@ -23,6 +23,10 @@ type SettingsProps = {
   saveErrorShake: boolean
   error: string | null
   onSaveSettings: () => Promise<void>
+  dictionaryText: string
+  setDictionaryText: Dispatch<SetStateAction<string>>
+  dictionaryStatus: SettingsStatusKey | null
+  onSaveDictionary: () => Promise<void>
 }
 
 type SettingsTab = 'general' | 'stt' | 'llm' | 'dictionary' | 'about'
@@ -39,6 +43,10 @@ export function Settings({
   saveErrorShake,
   error,
   onSaveSettings,
+  dictionaryText,
+  setDictionaryText,
+  dictionaryStatus,
+  onSaveDictionary,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const activeSttConfig = getActiveSttConfig(config)
@@ -382,6 +390,25 @@ export function Settings({
     <article className="section-card settings-panel-card">
       <h2>{t('settings.dictionary')}</h2>
       <p className="caption">{t('settings.dictionaryDescription')}</p>
+      <div className="field-stack">
+        <div className="field-group">
+          <label>{t('settings.dictionaryEntries')}</label>
+          <textarea
+            rows={10}
+            value={dictionaryText}
+            onChange={(event) => setDictionaryText(event.target.value)}
+            placeholder={t('settings.dictionaryPlaceholder')}
+            disabled={isLoadingConfig}
+          />
+          <p className="caption">{t('settings.dictionaryFormatHint')}</p>
+        </div>
+        <div className="field-row">
+          <button type="button" className="primary-save" onClick={onSaveDictionary} disabled={isLoadingConfig}>
+            {t('settings.dictionarySave')}
+          </button>
+          {dictionaryStatus && <p className="settings-feedback">{t(dictionaryStatus)}</p>}
+        </div>
+      </div>
     </article>
   )
 

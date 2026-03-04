@@ -28,8 +28,10 @@ function App() {
   const [config, setConfig] = useState<AppConfig>(defaultConfig)
   const [isLoadingConfig, setIsLoadingConfig] = useState(true)
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatusKey | null>(null)
+  const [dictionaryStatus, setDictionaryStatus] = useState<SettingsStatusKey | null>(null)
   const [showSttKey, setShowSttKey] = useState(false)
   const [showLlmKey, setShowLlmKey] = useState(false)
+  const [dictionaryText, setDictionaryText] = useState('')
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [doneFlash, setDoneFlash] = useState(false)
@@ -60,6 +62,8 @@ function App() {
       try {
         const loaded = await invoke<AppConfig>('get_config')
         if (mounted) setConfig(normalizeConfig(loaded))
+        const loadedDictionary = await invoke<string>('load_dictionary')
+        if (mounted) setDictionaryText(loadedDictionary)
       } catch (err) {
         if (mounted) setError(`${t('error.failedLoadConfig')}: ${String(err)}`)
       } finally {
@@ -127,6 +131,17 @@ function App() {
       setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
     }
   }
+  const saveDictionary = async () => {
+    setError(null)
+    setDictionaryStatus('settings.saving')
+    try {
+      await invoke('save_dictionary', { content: dictionaryText })
+      setDictionaryStatus('settings.saved')
+    } catch (err) {
+      setDictionaryStatus('settings.saveFailed')
+      setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
+    }
+  }
   const clearHistory = () => { setHistory([]); setLastResult(null); saveHistory([]) }
   const copyHistoryText = async (id: string, value: string) => {
     try { await navigator.clipboard.writeText(value); setCopySuccessId(id); window.setTimeout(() => setCopySuccessId(null), 1200) } catch { setError(t('status.error')) }
@@ -138,7 +153,25 @@ function App() {
       <main className="content-area">
         {page === 'home' && <Home locale={locale} pipelineStage={pipelineStage} recordingSeconds={recordingSeconds} doneFlash={doneFlash} micErrorShake={micErrorShake} isRecording={isRecording} isWorking={isWorking} error={error} history={history} lastResult={lastResult} totalWords={totalWords} timeSavedMinutes={timeSavedMinutes} onStartRecording={startRecording} onStopRecording={stopRecording} />}
         {page === 'history' && <History locale={locale} history={history} copySuccessId={copySuccessId} onClearHistory={clearHistory} onCopyHistoryText={copyHistoryText} />}
-        {page === 'settings' && <Settings config={config} setConfig={setConfig} isLoadingConfig={isLoadingConfig} showSttKey={showSttKey} setShowSttKey={setShowSttKey} showLlmKey={showLlmKey} setShowLlmKey={setShowLlmKey} settingsStatus={settingsStatus} saveErrorShake={saveErrorShake} error={error} onSaveSettings={saveSettings} />}
+        {page === 'settings' && (
+          <Settings
+            config={config}
+            setConfig={setConfig}
+            isLoadingConfig={isLoadingConfig}
+            showSttKey={showSttKey}
+            setShowSttKey={setShowSttKey}
+            showLlmKey={showLlmKey}
+            setShowLlmKey={setShowLlmKey}
+            settingsStatus={settingsStatus}
+            saveErrorShake={saveErrorShake}
+            error={error}
+            onSaveSettings={saveSettings}
+            dictionaryText={dictionaryText}
+            setDictionaryText={setDictionaryText}
+            dictionaryStatus={dictionaryStatus}
+            onSaveDictionary={saveDictionary}
+          />
+        )}
       </main>
     </div>
   )

@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod config;
+mod dictionary;
 mod llm;
 mod paste;
 mod prompts;
@@ -10,8 +11,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use audio::request_microphone_permission;
 use commands::{
-    get_config, save_config, start_recording, stop_recording, stop_recording_and_transcribe,
-    stop_recording_and_transcribe_with_mode, toggle_recording, AppState, VoiceMode,
+    get_config, load_dictionary, save_config, save_dictionary, start_recording, stop_recording,
+    stop_recording_and_transcribe, stop_recording_and_transcribe_with_mode, toggle_recording,
+    AppState, VoiceMode,
 };
 
 fn dictation_shortcut() -> Shortcut {
@@ -65,6 +67,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            load_dictionary,
+            save_dictionary,
             start_recording,
             stop_recording,
             stop_recording_and_transcribe,

@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
 use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
+use crate::dictionary::{load_dictionary_text, parse_dictionary_terms, save_dictionary_text};
 use crate::llm::create_provider as create_llm_provider;
 use crate::paste::{copy_to_clipboard, paste_text};
 use crate::prompts::system_prompt_for_mode;
@@ -107,6 +108,16 @@ pub fn get_config() -> Result<AppConfig, String> {
 #[tauri::command]
 pub fn save_config(config: AppConfig) -> Result<(), String> {
     persist_config(&config).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn load_dictionary() -> Result<String, String> {
+    load_dictionary_text().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn save_dictionary(content: String) -> Result<(), String> {
+    save_dictionary_text(&content).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -277,7 +288,8 @@ fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceM
         }
     };
 
-    let dictionary_terms: Vec<String> = Vec::new();
+    let dictionary_text = load_dictionary_text().unwrap_or_default();
+    let dictionary_terms = parse_dictionary_terms(&dictionary_text);
     let system_prompt = system_prompt_for_mode(
         mode,
         &config.llm.prompts,
