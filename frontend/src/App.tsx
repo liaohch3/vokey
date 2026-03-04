@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke as tauriInvoke } from '@tauri-apps/api/core'
+import { listen as tauriListen } from '@tauri-apps/api/event'
+
+// In non-Tauri environments (e.g. screenshot capture via http.server),
+// Tauri IPC is unavailable. Provide safe stubs to avoid runtime errors.
+const isTauri = typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+const invoke: typeof tauriInvoke = isTauri ? tauriInvoke : (async () => undefined) as never
+const listen: typeof tauriListen = isTauri ? tauriListen : (async () => () => {}) as never
 import './App.css'
 import { t, useLocale } from './i18n'
 import { Sidebar } from './components/Sidebar'
