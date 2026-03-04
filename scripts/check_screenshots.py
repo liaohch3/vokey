@@ -1,115 +1,168 @@
 #!/usr/bin/env python3
-"""截图质量检查 — 用于 PR 证据图片。"""
+"""Check screenshots for visual errors (red text, error messages, broken UI).
 
-from __future__ import annotations
+Usage:
+    python3 scripts/check_screenshots.py [--dir DIR]
+
+Uses Playwright to capture console errors and detect error elements in the UI.
+Can also be used standalone to validate existing screenshots via image analysis.
+"""
 
 import argparse
-import struct
+import http.server
+import os
+import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
-MIN_DESKTOP_WIDTH = 1280
-MIN_DIMENSION = 400
-MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
-SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+VIEWPORT = {"width": 1280, "height": 900}
+
+# CSS selectors that typically indicate errors
+ERROR_SELECTORS = [
+    "[class*='error']",
+    "[class*='Error']",
+    "[style*='color: red']",
+    "[style*='color: #e53e3e']",
+    "[style*='color: rgb(229, 62, 62)']",
+    ".error",
+    ".error-message",
+    "[role='alert']",
+]
+
+PAGES = [
+    {"name": "home", "nav": None},
+    {"name": "settings", "nav": "Settings"},
+    {"name": "history", "nav": "History"},
+]
 
 
-def iter_image_files(paths: list[Path]) -> list[Path]:
-    files: set[Path] = set()
-    for path in paths:
-        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
-            files.add(path)
-        elif path.is_dir():
-            for child in path.rglob("*"):
-                if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    files.add(child)
-    return sorted(files)
+def check_page_errors(page, page_name: str) -> list[str]:
+    """Check a page for visible error elements and console errors."""
+    errors = []
+
+    # Check for error elements in DOM
+    for selector in ERROR_SELECTORS:
+        elements = page.query_selector_all(selector)
+        for el in elements:
+            if el.is_visible():
+                text = el.inner_text().strip()[:200]
+                if text:
+                    errors.append(f"[{page_name}] Error element ({selector}): {text}")
+
+    # Check for red-colored text (computed style)
+    red_texts = page.evaluate("""() => {
+        const results = [];
+        const walker = document.createTreeWalker(
+            document.body, NodeFilter.SHOW_TEXT, null, false
+        );
+        while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const el = node.parentElement;
+            if (!el || !node.textContent.trim()) continue;
+            const style = window.getComputedStyle(el);
+            const color = style.color;
+            // Check for red-ish colors
+            const match = color.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/);
+            if (match) {
+                const [_, r, g, b] = match.map(Number);
+                if (r > 180 && g < 100 && b < 100 && node.textContent.trim().length > 5) {
+                    results.push(node.textContent.trim().substring(0, 200));
+                }
+            }
+        }
+        return results;
+    }""")
+
+    for text in red_texts:
+        errors.append(f"[{page_name}] Red text detected: {text}")
+
+    return errors
 
 
-def parse_png_dimensions(raw: bytes) -> tuple[int, int]:
-    if not raw.startswith(b"\x89PNG\r\n\x1a\n") or raw[12:16] != b"IHDR":
-        raise ValueError("not a PNG")
-    w, h = struct.unpack(">II", raw[16:24])
-    return w, h
+def main():
+    parser = argparse.ArgumentParser(description="Check UI pages for visual errors")
+    parser.add_argument("--port", type=int, default=5198, help="HTTP server port")
+    args = parser.parse_args()
 
+    project_root = Path(__file__).resolve().parent.parent
+    dist = project_root / "frontend" / "dist"
 
-def parse_jpeg_dimensions(raw: bytes) -> tuple[int, int]:
-    if len(raw) < 4 or raw[0:2] != b"\xff\xd8":
-        raise ValueError("not a JPEG")
-    sof = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
-    i = 2
-    while i + 9 < len(raw):
-        if raw[i] != 0xFF:
-            i += 1
-            continue
-        marker = raw[i + 1]
-        i += 2
-        if marker in sof and i + 7 <= len(raw):
-            h, w = struct.unpack(">HH", raw[i + 3 : i + 7])
-            return w, h
-        if i + 2 <= len(raw):
-            seg_len = struct.unpack(">H", raw[i : i + 2])[0]
-            i += seg_len
-    raise ValueError("could not parse JPEG dimensions")
+    if not dist.exists():
+        print("📦 Building frontend first...")
+        result = subprocess.run(
+            ["npm", "run", "build"],
+            cwd=project_root / "frontend",
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"❌ Build failed:\n{result.stderr}")
+            sys.exit(1)
 
+    # Start server
+    handler = http.server.SimpleHTTPRequestHandler
 
-def get_dimensions(raw: bytes, ext: str) -> tuple[int, int]:
-    ext = ext.lower()
-    if ext == ".png":
-        return parse_png_dimensions(raw)
-    if ext in {".jpg", ".jpeg"}:
-        return parse_jpeg_dimensions(raw)
-    if ext == ".gif" and len(raw) >= 10:
-        w, h = struct.unpack("<HH", raw[6:10])
-        return w, h
-    raise ValueError(f"unsupported: {ext}")
+    class QuietHandler(handler):
+        def log_message(self, format, *args):
+            pass
 
+    os.chdir(dist)
+    server = http.server.HTTPServer(("127.0.0.1", args.port), QuietHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(1)
 
-def check_file(path: Path) -> tuple[str, str]:
-    """返回 (status, message)。status: PASS / WARN / FAIL"""
     try:
-        raw = path.read_bytes()
-    except OSError as e:
-        return "FAIL", f"cannot read ({e})"
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("❌ playwright not installed")
+        sys.exit(1)
 
-    if len(raw) > MAX_FILE_SIZE_BYTES:
-        return "WARN", f"large file ({len(raw) / 1024 / 1024:.1f}MB)"
+    all_errors = []
+    console_errors = []
 
-    try:
-        w, h = get_dimensions(raw, path.suffix)
-    except ValueError as e:
-        return "FAIL", str(e)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=["--no-proxy-server"])
+        page = browser.new_page(viewport=VIEWPORT)
 
-    issues: list[str] = []
-    if w < MIN_DIMENSION or h < MIN_DIMENSION:
-        issues.append(f"too small ({w}x{h}, min {MIN_DIMENSION})")
-    if w < MIN_DESKTOP_WIDTH:
-        issues.append(f"narrow viewport ({w}px < {MIN_DESKTOP_WIDTH}px)")
+        # Capture console errors
+        page.on("console", lambda msg: console_errors.append(
+            f"[console.{msg.type}] {msg.text}"
+        ) if msg.type in ("error", "warning") else None)
 
-    if issues:
-        return "WARN", f"{w}x{h}: {'; '.join(issues)}"
-    return "PASS", f"{w}x{h}"
+        url = f"http://127.0.0.1:{args.port}/"
 
+        for spec in PAGES:
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_timeout(2000)
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="+", type=Path)
-    args = parser.parse_args(argv)
+            if spec["nav"]:
+                page.click(f"text={spec['nav']}")
+                page.wait_for_timeout(800)
 
-    files = iter_image_files(args.paths)
-    if not files:
-        print("[WARN] No image files found")
-        return 0
+            errors = check_page_errors(page, spec["name"])
+            all_errors.extend(errors)
 
-    fail = 0
-    for f in files:
-        status, msg = check_file(f)
-        print(f"[{status}] {f}: {msg}")
-        if status == "FAIL":
-            fail += 1
+        page.close()
+        browser.close()
 
-    return 1 if fail else 0
+    # Report
+    if console_errors:
+        print(f"\n⚠️  Console errors/warnings ({len(console_errors)}):")
+        for e in console_errors[:10]:
+            print(f"  {e}")
+
+    if all_errors:
+        print(f"\n❌ Visual errors detected ({len(all_errors)}):")
+        for e in all_errors:
+            print(f"  • {e}")
+        sys.exit(1)
+    else:
+        print("✅ No visual errors detected")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

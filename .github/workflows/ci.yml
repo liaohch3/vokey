@@ -44,6 +44,20 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  pr-quality:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check PR body quality
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check_pr_body.py
+
   legibility:
     runs-on: ubuntu-latest
     steps:
