@@ -17,7 +17,8 @@
 .app-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   color: var(--gray-900);
   background: var(--gray-50);
 }
@@ -169,10 +170,13 @@
 .content-area {
   padding: 22px;
   background: var(--gray-50);
+  display: flex;
+  min-height: 0;
   overflow-y: auto;
 }
 
 .page {
+  width: 100%;
   max-width: 1100px;
   animation: fade-in 150ms ease;
 }
@@ -470,6 +474,73 @@
   color: var(--red-500);
 }
 
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.settings-layout {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.settings-tabs {
+  padding: 10px;
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 6px;
+  align-content: start;
+}
+
+.settings-tab-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  height: 38px;
+  background: transparent;
+  color: var(--gray-700);
+  font-size: 0.9rem;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.settings-tab-btn:hover {
+  background: var(--gray-100);
+}
+
+.settings-tab-btn.active {
+  background: var(--blue-50);
+  color: var(--blue-600);
+  font-weight: 600;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px;
+}
+
+.settings-tab-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+.settings-panel-footer {
+  margin-top: 10px;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 10px;
+}
+
 .settings-grid {
   margin-top: 14px;
   display: grid;
@@ -477,7 +548,13 @@
 }
 
 .section-card {
-  padding: 14px;
+  padding: 0;
+}
+
+.settings-panel-card {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .section-card h2 {
@@ -738,5 +815,14 @@ textarea:focus {
   .stats-grid,
   .latest-content {
     grid-template-columns: 1fr;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 38px;
   }
 }
