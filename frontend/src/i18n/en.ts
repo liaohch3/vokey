@@ -45,7 +45,6 @@ export const en = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': 'Mock',
   'settings.sttApiKey': 'STT API Key',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': 'STT Model',

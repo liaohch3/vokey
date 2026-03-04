@@ -19,7 +19,7 @@ export type HistoryItem = {
   polishedText: string
 }
 
-export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow' | 'mock'
+export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow'
 
 export type LlmProvider =
   | 'gemini'

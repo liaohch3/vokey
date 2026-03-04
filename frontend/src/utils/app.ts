@@ -222,7 +222,6 @@ export const getActiveSttConfig = (config: AppConfig): SttProviderConfig => {
     case 'siliconflow':
       return config.stt.siliconflow
     case 'groq':
-    case 'mock':
     default:
       return config.stt.groq
   }
@@ -239,7 +238,6 @@ export const setActiveSttConfig = (config: AppConfig, next: SttProviderConfig): 
     case 'siliconflow':
       return { ...config, stt: { ...config.stt, siliconflow: next } }
     case 'groq':
-    case 'mock':
     default:
       return { ...config, stt: { ...config.stt, groq: next } }
   }

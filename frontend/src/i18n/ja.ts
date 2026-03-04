@@ -47,7 +47,6 @@ export const ja: Translations = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': 'モック',
   'settings.sttApiKey': '音声認識 APIキー',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': '音声認識モデル',

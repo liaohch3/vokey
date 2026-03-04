@@ -47,7 +47,6 @@ export const zhTW: Translations = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': '模擬',
   'settings.sttApiKey': '語音轉文字 API 金鑰',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': '語音轉文字模型',

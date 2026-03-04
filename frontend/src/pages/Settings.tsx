@@ -130,14 +130,6 @@ export function Settings({
             >
               {t('settings.sttProviderSiliconFlow')}
             </button>
-            <button
-              type="button"
-              className={config.stt.provider === 'mock' ? 'active' : ''}
-              onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'mock' } }))}
-              disabled={isLoadingConfig}
-            >
-              {t('settings.sttProviderMock')}
-            </button>
           </div>
         </div>
 
@@ -154,7 +146,7 @@ export function Settings({
                 }))
               }
               placeholder={t('settings.sttApiKeyPlaceholder')}
-              disabled={isLoadingConfig || config.stt.provider === 'mock'}
+              disabled={isLoadingConfig}
             />
             <button type="button" className="text-button" onClick={() => setShowSttKey((value) => !value)}>
               {showSttKey ? t('settings.hideKey') : t('settings.showKey')}
@@ -169,7 +161,7 @@ export function Settings({
             onChange={(event) =>
               setConfig((prev) => setActiveSttConfig(prev, { ...getActiveSttConfig(prev), model: event.target.value }))
             }
-            disabled={isLoadingConfig || config.stt.provider === 'mock'}
+            disabled={isLoadingConfig}
           />
         </div>
 
@@ -185,7 +177,7 @@ export function Settings({
                 }),
               )
             }
-            disabled={isLoadingConfig || config.stt.provider === 'mock'}
+            disabled={isLoadingConfig}
           >
             <option value="auto">{t('settings.languageAuto')}</option>
             <option value="zh">{t('settings.languageChinese')}</option>

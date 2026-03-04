@@ -47,7 +47,6 @@ export const zhCN: Translations = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': '模拟',
   'settings.sttApiKey': '语音转文字 API 密钥',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': '语音转文字模型',

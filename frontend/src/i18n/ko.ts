@@ -47,7 +47,6 @@ export const ko: Translations = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': '모의',
   'settings.sttApiKey': '음성인식 API 키',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': '음성인식 모델',

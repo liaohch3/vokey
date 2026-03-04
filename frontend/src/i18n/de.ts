@@ -47,7 +47,6 @@ export const de: Translations = {
   'settings.sttOpenRouter': 'OpenRouter',
   'settings.sttProviderDeepgram': 'Deepgram Nova-3',
   'settings.sttProviderSiliconFlow': 'SiliconFlow',
-  'settings.sttProviderMock': 'Mock',
   'settings.sttApiKey': 'STT-API-Schlüssel',
   'settings.sttApiKeyPlaceholder': 'gsk_...',
   'settings.sttModel': 'STT-Modell',
