@@ -102,6 +102,7 @@ export type AppConfig = {
     siliconflow: OpenAiCompatibleConfig
     ollama: OpenAiCompatibleConfig
   }
+  onboarding_completed: boolean
 }
 
 export type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFailed'

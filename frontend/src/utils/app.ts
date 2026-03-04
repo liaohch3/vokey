@@ -66,6 +66,7 @@ export const defaultConfig = (): AppConfig => ({
     siliconflow: { model: 'Qwen/Qwen2.5-7B-Instruct', base_url: 'https://api.siliconflow.cn' },
     ollama: { model: 'qwen2.5:7b', base_url: 'http://localhost:11434' },
   },
+  onboarding_completed: false,
 })
 
 export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined): AppConfig => {
@@ -143,6 +144,7 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
         base_url: incoming.llm?.ollama?.base_url ?? fallback.llm.ollama.base_url,
       },
     },
+    onboarding_completed: incoming.onboarding_completed ?? fallback.onboarding_completed,
   }
 }
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
-use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
+use crate::config::{config_path, load_or_create_config, save_config as persist_config, AppConfig};
 use crate::dictionary::{load_dictionary_text, parse_dictionary_terms, save_dictionary_text};
 use crate::history::{
     clear_history as clear_history_db, delete_entry as delete_history_entry_db,
@@ -113,6 +113,12 @@ pub fn get_config() -> Result<AppConfig, String> {
 #[tauri::command]
 pub fn save_config(config: AppConfig) -> Result<(), String> {
     persist_config(&config).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn is_first_run() -> Result<bool, String> {
+    let path = config_path().map_err(|err| err.to_string())?;
+    Ok(!path.exists())
 }
 
 #[tauri::command]

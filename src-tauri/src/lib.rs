@@ -13,9 +13,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use audio::request_microphone_permission;
 use commands::{
     add_history_entry, clear_history, delete_entry, get_config, get_history,
-    import_legacy_history_entries, load_dictionary, save_config, save_dictionary, start_recording,
-    stop_recording, stop_recording_and_transcribe, stop_recording_and_transcribe_with_mode,
-    toggle_recording, AppState, VoiceMode,
+    import_legacy_history_entries, is_first_run, load_dictionary, save_config, save_dictionary,
+    start_recording, stop_recording, stop_recording_and_transcribe,
+    stop_recording_and_transcribe_with_mode, toggle_recording, AppState, VoiceMode,
 };
 
 fn dictation_shortcut() -> Shortcut {
@@ -68,6 +68,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
+            is_first_run,
             save_config,
             load_dictionary,
             save_dictionary,

@@ -79,6 +79,8 @@ pub struct AppConfig {
     pub stt: SttConfig,
     #[serde(default)]
     pub llm: LlmConfig,
+    #[serde(default)]
+    pub onboarding_completed: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

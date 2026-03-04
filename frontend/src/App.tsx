@@ -12,6 +12,7 @@ import { t, useLocale } from './i18n'
 import { Sidebar } from './components/Sidebar'
 import { History } from './pages/History'
 import { Home } from './pages/Home'
+import { Onboarding } from './pages/Onboarding'
 import { Settings } from './pages/Settings'
 import type {
   AppConfig,
@@ -41,6 +42,7 @@ function App() {
   const [showSttKey, setShowSttKey] = useState(false)
   const [showLlmKey, setShowLlmKey] = useState(false)
   const [dictionaryText, setDictionaryText] = useState('')
+  const [isFirstRun, setIsFirstRun] = useState(false)
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [doneFlash, setDoneFlash] = useState(false)
@@ -69,6 +71,8 @@ function App() {
     const fetchConfig = async () => {
       setIsLoadingConfig(true)
       try {
+        const firstRun = await invoke<boolean>('is_first_run')
+        if (mounted) setIsFirstRun(firstRun)
         const loaded = await invoke<AppConfig>('get_config')
         if (mounted) setConfig(normalizeConfig(loaded))
         const loadedDictionary = await invoke<string>('load_dictionary')
@@ -177,6 +181,13 @@ function App() {
       setError(`${t('error.failedSaveConfig')}: ${String(err)}`)
     }
   }
+  const completeOnboarding = async () => {
+    const nextConfig = { ...config, onboarding_completed: true }
+    await invoke('save_config', { config: nextConfig })
+    setConfig(nextConfig)
+    setIsFirstRun(false)
+    setPage('home')
+  }
   const clearHistory = async () => {
     await invoke('clear_history')
     setHistory([])
@@ -190,7 +201,12 @@ function App() {
     <div className="app-shell" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <Sidebar page={page} locale={locale} setPage={setPage} setLocale={setLocale} />
       <main className="content-area">
-        {page === 'home' && <Home locale={locale} pipelineStage={pipelineStage} recordingSeconds={recordingSeconds} doneFlash={doneFlash} micErrorShake={micErrorShake} isRecording={isRecording} isWorking={isWorking} error={error} history={history} lastResult={lastResult} totalWords={totalWords} timeSavedMinutes={timeSavedMinutes} onStartRecording={startRecording} onStopRecording={stopRecording} />}
+        {page === 'home' &&
+          (isFirstRun && !config.onboarding_completed ? (
+            <Onboarding config={config} setConfig={setConfig} isLoading={isLoadingConfig} onComplete={completeOnboarding} />
+          ) : (
+            <Home locale={locale} pipelineStage={pipelineStage} recordingSeconds={recordingSeconds} doneFlash={doneFlash} micErrorShake={micErrorShake} isRecording={isRecording} isWorking={isWorking} error={error} history={history} lastResult={lastResult} totalWords={totalWords} timeSavedMinutes={timeSavedMinutes} onStartRecording={startRecording} onStopRecording={stopRecording} />
+          ))}
         {page === 'history' && <History locale={locale} history={history} copySuccessId={copySuccessId} onClearHistory={clearHistory} onCopyHistoryText={copyHistoryText} />}
         {page === 'settings' && (
           <Settings
