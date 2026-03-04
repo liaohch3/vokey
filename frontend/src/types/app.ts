@@ -43,6 +43,12 @@ export type OpenAiCompatibleConfig = {
   base_url: string
 }
 
+export type PromptTemplates = {
+  dictation: string
+  ask_anything: string
+  translation: string
+}
+
 export type AppConfig = {
   stt: {
     provider: SttProvider
@@ -58,6 +64,7 @@ export type AppConfig = {
     api_key: string
     system_prompt: string
     target_lang: string
+    prompts: PromptTemplates
     gemini: {
       model: string
     }

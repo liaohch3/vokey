@@ -26,7 +26,7 @@ pub struct AppState {
 pub enum VoiceMode {
     Dictation,
     AskAnything,
-    Translation { target_lang: String },
+    Translation,
 }
 
 #[derive(Serialize)]
@@ -123,9 +123,8 @@ pub fn stop_recording_and_transcribe_with_mode(
     app: AppHandle,
     state: State<'_, AppState>,
     mode: String,
-    target_lang: Option<String>,
 ) -> Result<TranscriptionResult, String> {
-    let mode = parse_voice_mode(&mode, target_lang)?;
+    let mode = parse_voice_mode(&mode)?;
     stop_recording_and_transcribe_by_mode(app, state, mode)
 }
 
@@ -258,20 +257,18 @@ fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceM
         }
     };
 
-    let resolved_mode = match mode {
-        VoiceMode::Translation { target_lang } if target_lang.trim().is_empty() => {
-            VoiceMode::Translation {
-                target_lang: config.llm.target_lang.clone(),
-            }
-        }
-        _ => mode.clone(),
-    };
-
-    let system_prompt = system_prompt_for_mode(&resolved_mode, &config.llm.system_prompt);
+    let dictionary_terms: Vec<String> = Vec::new();
+    let system_prompt = system_prompt_for_mode(
+        mode,
+        &config.llm.prompts,
+        &config.llm.system_prompt,
+        &config.llm.target_lang,
+        &dictionary_terms,
+    );
     log::info!(
         "generating text with llm provider: {} and mode: {:?}",
         llm_provider.name(),
-        resolved_mode
+        mode
     );
 
     match llm_provider.generate(&system_prompt, raw_text) {
@@ -283,13 +280,11 @@ fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceM
     }
 }
 
-fn parse_voice_mode(mode: &str, target_lang: Option<String>) -> Result<VoiceMode, String> {
+fn parse_voice_mode(mode: &str) -> Result<VoiceMode, String> {
     match mode {
         "dictation" => Ok(VoiceMode::Dictation),
         "ask_anything" => Ok(VoiceMode::AskAnything),
-        "translation" => Ok(VoiceMode::Translation {
-            target_lang: target_lang.unwrap_or_else(|| "English".to_string()),
-        }),
+        "translation" => Ok(VoiceMode::Translation),
         other => Err(format!(
             "unsupported voice mode: {other}. expected dictation | ask_anything | translation"
         )),

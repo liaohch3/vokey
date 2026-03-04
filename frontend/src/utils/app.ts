@@ -41,6 +41,14 @@ export const defaultConfig = (): AppConfig => ({
     api_key: '',
     system_prompt: t('settings.defaultSystemPrompt'),
     target_lang: 'English',
+    prompts: {
+      dictation:
+        "You are a dictation cleanup assistant.\n\nRules (in priority order):\n1. PUNCTUATION - Add punctuation at speech pauses\n2. CLEANUP - Remove filler words, false starts, repetitions\n3. LISTS - Detect enumeration signals, format as numbered lists\n4. PARAGRAPHS - Separate distinct topics with blank lines\n5. PRESERVE - Keep original language, technical terms, proper nouns\n6. OUTPUT - Return only the cleaned text, no explanation\n\n{dictionary_injection}",
+      ask_anything:
+        "You are a helpful assistant. Answer the user's question concisely.\nIf the user references selected text, apply their instruction to that text.\nOutput only the result, no explanation or preamble.\n\n{dictionary_injection}",
+      translation:
+        'Translate the following text to {target_language}.\nPreserve the original meaning, tone, and formatting.\nOutput only the translation, no explanation.\n\n{dictionary_injection}',
+    },
     gemini: { model: 'gemini-2.0-flash' },
     openai: { model: 'gpt-4o-mini', base_url: 'https://api.openai.com' },
     openrouter: { model: 'openai/gpt-4o-mini', base_url: 'https://openrouter.ai/api/v1' },
@@ -89,6 +97,11 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
       api_key: incoming.llm?.api_key ?? fallback.llm.api_key,
       system_prompt: incoming.llm?.system_prompt ?? fallback.llm.system_prompt,
       target_lang: incoming.llm?.target_lang ?? fallback.llm.target_lang,
+      prompts: {
+        dictation: incoming.llm?.prompts?.dictation ?? fallback.llm.prompts.dictation,
+        ask_anything: incoming.llm?.prompts?.ask_anything ?? fallback.llm.prompts.ask_anything,
+        translation: incoming.llm?.prompts?.translation ?? fallback.llm.prompts.translation,
+      },
       gemini: { model: incoming.llm?.gemini?.model ?? fallback.llm.gemini.model },
       openai: {
         model: incoming.llm?.openai?.model ?? fallback.llm.openai.model,
