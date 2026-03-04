@@ -6,6 +6,7 @@ use super::{LlmError, LlmProvider};
 
 pub struct OpenAiCompatibleProvider {
     client: Client,
+    provider_name: String,
     api_key: String,
     model: String,
     base_url: String,
@@ -39,9 +40,10 @@ struct ChatChoiceMessage {
 }
 
 impl OpenAiCompatibleProvider {
-    pub fn new(api_key: String, model: String, base_url: String) -> Self {
+    pub fn new(provider_name: String, api_key: String, model: String, base_url: String) -> Self {
         Self {
             client: Client::new(),
+            provider_name,
             api_key,
             model,
             base_url,
@@ -55,7 +57,7 @@ impl OpenAiCompatibleProvider {
 }
 
 impl LlmProvider for OpenAiCompatibleProvider {
-    fn polish(&self, raw_text: &str, system_prompt: &str) -> Result<String, LlmError> {
+    fn generate(&self, system_prompt: &str, user_message: &str) -> Result<String, LlmError> {
         let body = ChatCompletionsRequest {
             model: self.model.clone(),
             messages: vec![
@@ -65,7 +67,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 },
                 ChatMessage {
                     role: "user".to_string(),
-                    content: raw_text.to_string(),
+                    content: user_message.to_string(),
                 },
             ],
         };
@@ -99,7 +101,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
     }
 
     fn name(&self) -> &str {
-        "openai"
+        &self.provider_name
     }
 }
 

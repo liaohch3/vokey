@@ -2,13 +2,14 @@ use std::sync::mpsc;
 use std::thread;
 
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
 use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
 use crate::llm::create_provider as create_llm_provider;
 use crate::paste::{copy_to_clipboard, paste_text};
+use crate::prompts::system_prompt_for_mode;
 use crate::stt::create_provider as create_stt_provider;
 
 enum AudioRequest {
@@ -18,6 +19,14 @@ enum AudioRequest {
 
 pub struct AppState {
     audio_tx: mpsc::Sender<AudioRequest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum VoiceMode {
+    Dictation,
+    AskAnything,
+    Translation { target_lang: String },
 }
 
 #[derive(Serialize)]
@@ -106,6 +115,25 @@ pub fn stop_recording_and_transcribe(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TranscriptionResult, String> {
+    stop_recording_and_transcribe_by_mode(app, state, VoiceMode::Dictation)
+}
+
+#[tauri::command]
+pub fn stop_recording_and_transcribe_with_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    mode: String,
+    target_lang: Option<String>,
+) -> Result<TranscriptionResult, String> {
+    let mode = parse_voice_mode(&mode, target_lang)?;
+    stop_recording_and_transcribe_by_mode(app, state, mode)
+}
+
+fn stop_recording_and_transcribe_by_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    mode: VoiceMode,
+) -> Result<TranscriptionResult, String> {
     let wav = state.stop_recording().map_err(|err| err.to_string())?;
     app.emit("recording-state-changed", false)
         .map_err(|err| err.to_string())?;
@@ -122,7 +150,7 @@ pub fn stop_recording_and_transcribe(
         .map_err(|err| err.to_string())?;
 
     emit_pipeline_status(&app, "polishing", None, None);
-    let polished_text = polish_text_with_fallback(&config, &raw_text);
+    let polished_text = generate_text_with_fallback(&config, &raw_text, &mode);
     emit_pipeline_status(&app, "done", Some(&polished_text), None);
 
     Ok(TranscriptionResult {
@@ -150,7 +178,7 @@ pub fn toggle_recording(app: &AppHandle) {
 
                 let app_handle = app.clone();
                 thread::spawn(move || {
-                    run_transcribe_and_paste_pipeline(app_handle, wav);
+                    run_transcribe_and_paste_pipeline(app_handle, wav, VoiceMode::Dictation);
                 });
             }
             Err(err) => {
@@ -163,7 +191,7 @@ pub fn toggle_recording(app: &AppHandle) {
     }
 }
 
-fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
+fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>, mode: VoiceMode) {
     emit_pipeline_status(&app, "transcribing", None, None);
 
     let config = match load_or_create_config() {
@@ -201,7 +229,7 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
     };
 
     emit_pipeline_status(&app, "polishing", None, None);
-    let polished_text = polish_text_with_fallback(&config, &raw_text);
+    let polished_text = generate_text_with_fallback(&config, &raw_text, &mode);
 
     let mut done_message = None::<String>;
     if let Err(err) = paste_text(&polished_text) {
@@ -221,7 +249,7 @@ fn run_transcribe_and_paste_pipeline(app: AppHandle, wav: Vec<u8>) {
     emit_pipeline_status(&app, "done", Some(&polished_text), done_message.as_deref());
 }
 
-fn polish_text_with_fallback(config: &AppConfig, raw_text: &str) -> String {
+fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceMode) -> String {
     let llm_provider = match create_llm_provider(&config.llm) {
         Ok(provider) => provider,
         Err(err) => {
@@ -230,13 +258,41 @@ fn polish_text_with_fallback(config: &AppConfig, raw_text: &str) -> String {
         }
     };
 
-    log::info!("polishing text with llm provider: {}", llm_provider.name());
-    match llm_provider.polish(raw_text, &config.llm.system_prompt) {
+    let resolved_mode = match mode {
+        VoiceMode::Translation { target_lang } if target_lang.trim().is_empty() => {
+            VoiceMode::Translation {
+                target_lang: config.llm.target_lang.clone(),
+            }
+        }
+        _ => mode.clone(),
+    };
+
+    let system_prompt = system_prompt_for_mode(&resolved_mode, &config.llm.system_prompt);
+    log::info!(
+        "generating text with llm provider: {} and mode: {:?}",
+        llm_provider.name(),
+        resolved_mode
+    );
+
+    match llm_provider.generate(&system_prompt, raw_text) {
         Ok(polished_text) => polished_text,
         Err(err) => {
-            log::warn!("llm polishing failed; fallback to raw text: {err}");
+            log::warn!("llm generation failed; fallback to raw text: {err}");
             raw_text.to_string()
         }
+    }
+}
+
+fn parse_voice_mode(mode: &str, target_lang: Option<String>) -> Result<VoiceMode, String> {
+    match mode {
+        "dictation" => Ok(VoiceMode::Dictation),
+        "ask_anything" => Ok(VoiceMode::AskAnything),
+        "translation" => Ok(VoiceMode::Translation {
+            target_lang: target_lang.unwrap_or_else(|| "English".to_string()),
+        }),
+        other => Err(format!(
+            "unsupported voice mode: {other}. expected dictation | ask_anything | translation"
+        )),
     }
 }
 

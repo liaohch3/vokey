@@ -57,7 +57,7 @@ impl GeminiProvider {
 }
 
 impl LlmProvider for GeminiProvider {
-    fn polish(&self, raw_text: &str, system_prompt: &str) -> Result<String, LlmError> {
+    fn generate(&self, system_prompt: &str, user_message: &str) -> Result<String, LlmError> {
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
             self.model, self.api_key
@@ -72,7 +72,7 @@ impl LlmProvider for GeminiProvider {
             contents: vec![GeminiMessage {
                 role: "user".to_string(),
                 parts: vec![GeminiPart {
-                    text: raw_text.to_string(),
+                    text: user_message.to_string(),
                 }],
             }],
         };
