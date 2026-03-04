@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_STT_MODEL: &str = "whisper-large-v3-turbo";
 const DEFAULT_OPENAI_STT_MODEL: &str = "whisper-1";
+const DEFAULT_OPENROUTER_STT_MODEL: &str = "openai/whisper-large-v3";
 const DEFAULT_DEEPGRAM_MODEL: &str = "nova-3";
 const DEFAULT_SILICONFLOW_STT_MODEL: &str = "FunAudioLLM/SenseVoiceSmall";
 
@@ -69,6 +70,8 @@ pub struct SttConfig {
     #[serde(default)]
     pub openai: SttProviderConfig,
     #[serde(default)]
+    pub openrouter: SttProviderConfig,
+    #[serde(default)]
     pub deepgram: SttProviderConfig,
     #[serde(default)]
     pub siliconflow: SttProviderConfig,
@@ -129,6 +132,7 @@ impl Default for SttConfig {
             api_key: String::new(),
             groq: SttProviderConfig::groq_default(),
             openai: SttProviderConfig::openai_default(),
+            openrouter: SttProviderConfig::openrouter_default(),
             deepgram: SttProviderConfig::deepgram_default(),
             siliconflow: SttProviderConfig::siliconflow_default(),
         }
@@ -146,6 +150,13 @@ impl SttProviderConfig {
     fn openai_default() -> Self {
         Self {
             model: DEFAULT_OPENAI_STT_MODEL.to_string(),
+            language: None,
+        }
+    }
+
+    fn openrouter_default() -> Self {
+        Self {
+            model: DEFAULT_OPENROUTER_STT_MODEL.to_string(),
             language: None,
         }
     }

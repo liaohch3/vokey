@@ -108,6 +108,14 @@ export function Settings({
             </button>
             <button
               type="button"
+              className={config.stt.provider === 'openrouter' ? 'active' : ''}
+              onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'openrouter' } }))}
+              disabled={isLoadingConfig}
+            >
+              {t('settings.sttOpenRouter')}
+            </button>
+            <button
+              type="button"
               className={config.stt.provider === 'deepgram' ? 'active' : ''}
               onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'deepgram' } }))}
               disabled={isLoadingConfig}

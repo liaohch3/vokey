@@ -19,7 +19,7 @@ export type HistoryItem = {
   polishedText: string
 }
 
-export type SttProvider = 'groq' | 'openai' | 'deepgram' | 'siliconflow' | 'mock'
+export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow' | 'mock'
 
 export type LlmProvider =
   | 'gemini'
@@ -49,6 +49,7 @@ export type AppConfig = {
     api_key: string
     groq: SttProviderConfig
     openai: SttProviderConfig
+    openrouter: SttProviderConfig
     deepgram: SttProviderConfig
     siliconflow: SttProviderConfig
   }
