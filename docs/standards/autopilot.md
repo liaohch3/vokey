@@ -99,6 +99,18 @@ GitHub Actions 在每个 PR 上运行：
 - 留评审意见 → Codex 响应并迭代
 - 要求改动 → 新一轮 Codex 执行
 
+### 第 6 步：沉淀复盘（必须）
+
+PR 合并后，编排器执行沉淀：
+
+1. **更新计划状态** — `status: completed`，补充 `## 复盘` 节（耗时、效果、做得好、可改进）
+2. **记录踩坑** — 遇到的问题写入 `docs/error-experience/YYYY-MM-DD-<slug>.md`
+3. **记录好实践** — 值得推广的做法写入 `docs/good-experience/YYYY-MM-DD-<slug>.md`
+4. **效果截图** — 关键效果截图存入 `docs/screenshots/` 或计划文件中引用
+5. **提交沉淀** — 沉淀内容单独 commit 到 main（`docs: retrospective for <slug>`）
+
+> 这一步不能跳过。没有复盘的闭环是断的。
+
 ## 监控
 
 cron job 监控活跃的 Codex 会话：
@@ -170,4 +182,4 @@ infra: add legibility CI workflow
 5. **结构化日志** — `log::info!()` 带上下文，不用 `println!()`
 6. **i18n 一切** — 所有用户可见文案走 `t()` 函数
 7. **无聊的技术** — 优先选稳定、文档好、可组合的依赖
-8. **小 PR** — 一个 PR 一件事，容易审查和回滚
+8. **小 PR** — 一个 PR 一件事，容易审查和回滚。复杂计划拆成多个 PR：每个 PR 对应计划中的一组任务（如 STT 扩展一个 PR、LLM 扩展一个 PR），不要把整个计划塞进一个大 PR

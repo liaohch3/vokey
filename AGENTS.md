@@ -78,14 +78,72 @@ trait LlmProvider: Send + Sync {
 不要把架构决策交给执行工具。
 能让 Codex 写的代码就不要手写。
 
-## 复合工程
+## 开发闭环（必须遵守）
 
-记录经验教训：
-- 踩坑记录：`docs/error-experience/YYYY-MM-DD-<slug>.md`
-- 好的实践：`docs/good-experience/YYYY-MM-DD-<slug>.md`
+每个功能/重构都必须走完完整闭环：
+
+```
+规划 → 执行 → 验证 → 沉淀
+```
+
+### 1. 规划（开发前）
+- 复杂功能写执行计划：`docs/plans/YYYY-MM-DD-<slug>.md`
+- 计划包含：目标、任务清单、验收标准
+- **不允许没有计划就开始写代码**（简单 bug fix 除外）
+
+### 2. 执行（开发中）
+- 见 Auto-pilot 工作流：`docs/standards/autopilot.md`
+- 关键进展要截图/录屏留档
+
+### 3. 验证（开发后）
+- gate check 全部通过
+- UI 变更必须截图（before/after 对比）
+- 更新计划状态为 `completed`
+
+### 4. 沉淀（PR 合并后，必须执行）
+每个 PR 合并后，编排器必须回顾并沉淀：
+
+**踩坑记录**（遇到问题时）：`docs/error-experience/YYYY-MM-DD-<slug>.md`
+```markdown
+## 问题
+发生了什么？
+
+## 根因
+为什么会这样？
+
+## 解决方案
+怎么修的？
+
+## 教训
+下次怎么避免？
+```
+
+**好实践记录**（做得好时）：`docs/good-experience/YYYY-MM-DD-<slug>.md`
+```markdown
+## 实践
+做了什么？
+
+## 效果
+带来了什么好处？数据/截图证明。
+
+## 推广
+哪些场景可以复用？
+```
+
+**进展报告**：在计划文件底部追加 `## 复盘` 节：
+```markdown
+## 复盘
+- **耗时**：实际 vs 预估
+- **效果**：截图/数据证明
+- **做得好**：...
+- **可改进**：...
+- **沉淀到**：docs/error-experience/... 或 docs/good-experience/...
+```
+
+> 没有沉淀的开发 = 白做。经验不记录就会重复踩坑。
 
 ## Auto-pilot
 
 完整工作流见 `docs/standards/autopilot.md`。
 
-一句话：人提需求 → Codex 写代码 + 测试 → Agent 自审 → PR → CI 验证 → 人合并。
+一句话：人提需求 → 执行计划 → Codex 写代码 + 测试 → Agent 自审 → PR → CI 验证 → 人合并 → **沉淀复盘**。
