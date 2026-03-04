@@ -44,6 +44,28 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  screenshots:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+        working-directory: frontend
+      - name: Install Playwright
+        run: pip install playwright && playwright install chromium --with-deps
+      - name: Capture screenshots
+        run: python3 scripts/screenshot.py --out /tmp/screenshots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: /tmp/screenshots/
+
   legibility:
     runs-on: ubuntu-latest
     steps:
