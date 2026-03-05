@@ -1,5 +1,12 @@
 import { t, type Locale } from '../i18n'
-import type { AppConfig, HistoryItem, LlmProvider, OpenAiCompatibleConfig, SttProviderConfig } from '../types/app'
+import type {
+  AppConfig,
+  BackendHistoryEntry,
+  HistoryItem,
+  LlmProvider,
+  OpenAiCompatibleConfig,
+  SttProviderConfig,
+} from '../types/app'
 
 export const HISTORY_KEY = 'vokey.history.v1'
 export const APP_VERSION = 'v0.1.0'
@@ -41,6 +48,14 @@ export const defaultConfig = (): AppConfig => ({
     api_key: '',
     system_prompt: t('settings.defaultSystemPrompt'),
     target_lang: 'English',
+    prompts: {
+      dictation:
+        "You are a dictation cleanup assistant.\n\nRules (in priority order):\n1. PUNCTUATION - Add punctuation at speech pauses\n2. CLEANUP - Remove filler words, false starts, repetitions\n3. LISTS - Detect enumeration signals, format as numbered lists\n4. PARAGRAPHS - Separate distinct topics with blank lines\n5. PRESERVE - Keep original language, technical terms, proper nouns\n6. OUTPUT - Return only the cleaned text, no explanation\n\n{dictionary_injection}",
+      ask_anything:
+        "You are a helpful assistant. Answer the user's question concisely.\nIf the user references selected text, apply their instruction to that text.\nOutput only the result, no explanation or preamble.\n\n{dictionary_injection}",
+      translation:
+        'Translate the following text to {target_language}.\nPreserve the original meaning, tone, and formatting.\nOutput only the translation, no explanation.\n\n{dictionary_injection}',
+    },
     gemini: { model: 'gemini-2.0-flash' },
     openai: { model: 'gpt-4o-mini', base_url: 'https://api.openai.com' },
     openrouter: { model: 'openai/gpt-4o-mini', base_url: 'https://openrouter.ai/api/v1' },
@@ -51,6 +66,7 @@ export const defaultConfig = (): AppConfig => ({
     siliconflow: { model: 'Qwen/Qwen2.5-7B-Instruct', base_url: 'https://api.siliconflow.cn' },
     ollama: { model: 'qwen2.5:7b', base_url: 'http://localhost:11434' },
   },
+  onboarding_completed: false,
 })
 
 export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined): AppConfig => {
@@ -89,6 +105,11 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
       api_key: incoming.llm?.api_key ?? fallback.llm.api_key,
       system_prompt: incoming.llm?.system_prompt ?? fallback.llm.system_prompt,
       target_lang: incoming.llm?.target_lang ?? fallback.llm.target_lang,
+      prompts: {
+        dictation: incoming.llm?.prompts?.dictation ?? fallback.llm.prompts.dictation,
+        ask_anything: incoming.llm?.prompts?.ask_anything ?? fallback.llm.prompts.ask_anything,
+        translation: incoming.llm?.prompts?.translation ?? fallback.llm.prompts.translation,
+      },
       gemini: { model: incoming.llm?.gemini?.model ?? fallback.llm.gemini.model },
       openai: {
         model: incoming.llm?.openai?.model ?? fallback.llm.openai.model,
@@ -123,10 +144,11 @@ export const normalizeConfig = (incoming: Partial<AppConfig> | null | undefined)
         base_url: incoming.llm?.ollama?.base_url ?? fallback.llm.ollama.base_url,
       },
     },
+    onboarding_completed: incoming.onboarding_completed ?? fallback.onboarding_completed,
   }
 }
 
-export const loadHistory = (): HistoryItem[] => {
+export const loadLegacyHistory = (): HistoryItem[] => {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (!raw) {
@@ -147,6 +169,21 @@ export const loadHistory = (): HistoryItem[] => {
 export const saveHistory = (items: HistoryItem[]) => {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
 }
+
+export const clearLegacyHistory = () => {
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+export const fromBackendHistory = (entry: BackendHistoryEntry): HistoryItem => ({
+  id: String(entry.id),
+  timestamp: entry.timestamp,
+  mode: entry.mode,
+  rawText: entry.raw_text,
+  polishedText: entry.polished_text,
+  sttProvider: entry.stt_provider,
+  llmProvider: entry.llm_provider,
+  durationMs: entry.duration_ms,
+})
 
 export const getLocaleFlag = (code: Locale): string => {
   switch (code) {
@@ -222,7 +259,6 @@ export const getActiveSttConfig = (config: AppConfig): SttProviderConfig => {
     case 'siliconflow':
       return config.stt.siliconflow
     case 'groq':
-    case 'mock':
     default:
       return config.stt.groq
   }
@@ -239,7 +275,6 @@ export const setActiveSttConfig = (config: AppConfig, next: SttProviderConfig): 
     case 'siliconflow':
       return { ...config, stt: { ...config.stt, siliconflow: next } }
     case 'groq':
-    case 'mock':
     default:
       return { ...config, stt: { ...config.stt, groq: next } }
   }

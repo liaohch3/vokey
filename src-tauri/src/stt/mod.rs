@@ -1,6 +1,5 @@
 mod deepgram;
 mod groq;
-pub mod mock;
 mod openai;
 mod openrouter;
 mod siliconflow;
@@ -96,7 +95,6 @@ pub fn create_provider(config: &SttConfig) -> Result<Box<dyn SttProvider>, SttEr
                 config.siliconflow.language.clone(),
             )))
         }
-        "mock" => Ok(Box::new(mock::MockSttProvider)),
         provider => Err(SttError::UnsupportedProvider(provider.to_string())),
     }
 }

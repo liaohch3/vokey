@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::thread;
 
 use base64::Engine;
@@ -6,7 +7,13 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio::{AudioError, AudioRecorder};
-use crate::config::{load_or_create_config, save_config as persist_config, AppConfig};
+use crate::config::{config_path, load_or_create_config, save_config as persist_config, AppConfig};
+use crate::dictionary::{load_dictionary_text, parse_dictionary_terms, save_dictionary_text};
+use crate::history::{
+    clear_history as clear_history_db, delete_entry as delete_history_entry_db,
+    get_history as get_history_db, import_legacy_history, insert_history, HistoryEntry,
+    LegacyHistoryEntry, NewHistoryEntry,
+};
 use crate::llm::create_provider as create_llm_provider;
 use crate::paste::{copy_to_clipboard, paste_text};
 use crate::prompts::system_prompt_for_mode;
@@ -19,6 +26,7 @@ enum AudioRequest {
 
 pub struct AppState {
     audio_tx: mpsc::Sender<AudioRequest>,
+    active_mode: Mutex<Option<VoiceMode>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +34,7 @@ pub struct AppState {
 pub enum VoiceMode {
     Dictation,
     AskAnything,
-    Translation { target_lang: String },
+    Translation,
 }
 
 #[derive(Serialize)]
@@ -61,7 +69,10 @@ impl AppState {
             }
         });
 
-        Self { audio_tx }
+        Self {
+            audio_tx,
+            active_mode: Mutex::new(None),
+        }
     }
 
     fn start_recording(&self) -> Result<(), AudioError> {
@@ -79,6 +90,19 @@ impl AppState {
             .map_err(|_| AudioError::NotRecording)?;
         response_rx.recv().map_err(|_| AudioError::NotRecording)?
     }
+
+    fn set_active_mode(&self, mode: VoiceMode) {
+        if let Ok(mut active_mode) = self.active_mode.lock() {
+            *active_mode = Some(mode);
+        }
+    }
+
+    fn take_active_mode_or(&self, fallback: VoiceMode) -> VoiceMode {
+        match self.active_mode.lock() {
+            Ok(mut active_mode) => active_mode.take().unwrap_or(fallback),
+            Err(_) => fallback,
+        }
+    }
 }
 
 #[tauri::command]
@@ -89,6 +113,47 @@ pub fn get_config() -> Result<AppConfig, String> {
 #[tauri::command]
 pub fn save_config(config: AppConfig) -> Result<(), String> {
     persist_config(&config).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn is_first_run() -> Result<bool, String> {
+    let path = config_path().map_err(|err| err.to_string())?;
+    Ok(!path.exists())
+}
+
+#[tauri::command]
+pub fn load_dictionary() -> Result<String, String> {
+    load_dictionary_text().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn save_dictionary(content: String) -> Result<(), String> {
+    save_dictionary_text(&content).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn get_history() -> Result<Vec<HistoryEntry>, String> {
+    get_history_db().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn add_history_entry(entry: NewHistoryEntry) -> Result<i64, String> {
+    insert_history(&entry).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn clear_history() -> Result<(), String> {
+    clear_history_db().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn delete_entry(id: i64) -> Result<(), String> {
+    delete_history_entry_db(id).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn import_legacy_history_entries(entries: Vec<LegacyHistoryEntry>) -> Result<usize, String> {
+    import_legacy_history(&entries).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -123,9 +188,8 @@ pub fn stop_recording_and_transcribe_with_mode(
     app: AppHandle,
     state: State<'_, AppState>,
     mode: String,
-    target_lang: Option<String>,
 ) -> Result<TranscriptionResult, String> {
-    let mode = parse_voice_mode(&mode, target_lang)?;
+    let mode = parse_voice_mode(&mode)?;
     stop_recording_and_transcribe_by_mode(app, state, mode)
 }
 
@@ -160,11 +224,12 @@ fn stop_recording_and_transcribe_by_mode(
     })
 }
 
-pub fn toggle_recording(app: &AppHandle) {
+pub fn toggle_recording(app: &AppHandle, mode: VoiceMode) {
     let state = app.state::<AppState>();
 
     match state.start_recording() {
         Ok(()) => {
+            state.set_active_mode(mode);
             if let Err(err) = app.emit("recording-state-changed", true) {
                 log::error!("failed to emit recording-state-changed event: {err}");
             }
@@ -172,13 +237,14 @@ pub fn toggle_recording(app: &AppHandle) {
         }
         Err(AudioError::AlreadyRecording) => match state.stop_recording() {
             Ok(wav) => {
+                let active_mode = state.take_active_mode_or(mode);
                 if let Err(err) = app.emit("recording-state-changed", false) {
                     log::error!("failed to emit recording-state-changed event: {err}");
                 }
 
                 let app_handle = app.clone();
                 thread::spawn(move || {
-                    run_transcribe_and_paste_pipeline(app_handle, wav, VoiceMode::Dictation);
+                    run_transcribe_and_paste_pipeline(app_handle, wav, active_mode);
                 });
             }
             Err(err) => {
@@ -258,20 +324,19 @@ fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceM
         }
     };
 
-    let resolved_mode = match mode {
-        VoiceMode::Translation { target_lang } if target_lang.trim().is_empty() => {
-            VoiceMode::Translation {
-                target_lang: config.llm.target_lang.clone(),
-            }
-        }
-        _ => mode.clone(),
-    };
-
-    let system_prompt = system_prompt_for_mode(&resolved_mode, &config.llm.system_prompt);
+    let dictionary_text = load_dictionary_text().unwrap_or_default();
+    let dictionary_terms = parse_dictionary_terms(&dictionary_text);
+    let system_prompt = system_prompt_for_mode(
+        mode,
+        &config.llm.prompts,
+        &config.llm.system_prompt,
+        &config.llm.target_lang,
+        &dictionary_terms,
+    );
     log::info!(
         "generating text with llm provider: {} and mode: {:?}",
         llm_provider.name(),
-        resolved_mode
+        mode
     );
 
     match llm_provider.generate(&system_prompt, raw_text) {
@@ -283,13 +348,11 @@ fn generate_text_with_fallback(config: &AppConfig, raw_text: &str, mode: &VoiceM
     }
 }
 
-fn parse_voice_mode(mode: &str, target_lang: Option<String>) -> Result<VoiceMode, String> {
+fn parse_voice_mode(mode: &str) -> Result<VoiceMode, String> {
     match mode {
         "dictation" => Ok(VoiceMode::Dictation),
         "ask_anything" => Ok(VoiceMode::AskAnything),
-        "translation" => Ok(VoiceMode::Translation {
-            target_lang: target_lang.unwrap_or_else(|| "English".to_string()),
-        }),
+        "translation" => Ok(VoiceMode::Translation),
         other => Err(format!(
             "unsupported voice mode: {other}. expected dictation | ask_anything | translation"
         )),

@@ -15,11 +15,36 @@ export type PipelineStatusPayload = {
 export type HistoryItem = {
   id: string
   timestamp: string
+  mode: string
   rawText: string
   polishedText: string
+  sttProvider: string
+  llmProvider: string
+  durationMs: number
 }
 
-export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow' | 'mock'
+export type BackendHistoryEntry = {
+  id: number
+  timestamp: string
+  mode: string
+  raw_text: string
+  polished_text: string
+  stt_provider: string
+  llm_provider: string
+  duration_ms: number
+}
+
+export type NewHistoryEntry = {
+  timestamp: string
+  mode: string
+  raw_text: string
+  polished_text: string
+  stt_provider: string
+  llm_provider: string
+  duration_ms: number
+}
+
+export type SttProvider = 'groq' | 'openai' | 'openrouter' | 'deepgram' | 'siliconflow'
 
 export type LlmProvider =
   | 'gemini'
@@ -43,6 +68,12 @@ export type OpenAiCompatibleConfig = {
   base_url: string
 }
 
+export type PromptTemplates = {
+  dictation: string
+  ask_anything: string
+  translation: string
+}
+
 export type AppConfig = {
   stt: {
     provider: SttProvider
@@ -58,6 +89,7 @@ export type AppConfig = {
     api_key: string
     system_prompt: string
     target_lang: string
+    prompts: PromptTemplates
     gemini: {
       model: string
     }
@@ -70,6 +102,7 @@ export type AppConfig = {
     siliconflow: OpenAiCompatibleConfig
     ollama: OpenAiCompatibleConfig
   }
+  onboarding_completed: boolean
 }
 
 export type SettingsStatusKey = 'settings.saving' | 'settings.saved' | 'settings.saveFailed'

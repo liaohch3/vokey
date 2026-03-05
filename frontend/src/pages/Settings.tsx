@@ -23,6 +23,10 @@ type SettingsProps = {
   saveErrorShake: boolean
   error: string | null
   onSaveSettings: () => Promise<void>
+  dictionaryText: string
+  setDictionaryText: Dispatch<SetStateAction<string>>
+  dictionaryStatus: SettingsStatusKey | null
+  onSaveDictionary: () => Promise<void>
 }
 
 type SettingsTab = 'general' | 'stt' | 'llm' | 'dictionary' | 'about'
@@ -39,6 +43,10 @@ export function Settings({
   saveErrorShake,
   error,
   onSaveSettings,
+  dictionaryText,
+  setDictionaryText,
+  dictionaryStatus,
+  onSaveDictionary,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const activeSttConfig = getActiveSttConfig(config)
@@ -74,8 +82,16 @@ export function Settings({
       <h2>{t('settings.general')}</h2>
       <div className="field-stack">
         <div className="field-row">
-          <label>{t('settings.shortcut')}</label>
-          <span className="badge">{t('settings.shortcutValue')}</span>
+          <label>{t('settings.shortcutDictationLabel')}</label>
+          <span className="badge">{t('settings.shortcutDictationValue')}</span>
+        </div>
+        <div className="field-row">
+          <label>{t('settings.shortcutAskLabel')}</label>
+          <span className="badge">{t('settings.shortcutAskValue')}</span>
+        </div>
+        <div className="field-row">
+          <label>{t('settings.shortcutTranslateLabel')}</label>
+          <span className="badge">{t('settings.shortcutTranslateValue')}</span>
         </div>
         <p className="caption">{t('settings.generalDescription')}</p>
       </div>
@@ -130,14 +146,6 @@ export function Settings({
             >
               {t('settings.sttProviderSiliconFlow')}
             </button>
-            <button
-              type="button"
-              className={config.stt.provider === 'mock' ? 'active' : ''}
-              onClick={() => setConfig((prev) => ({ ...prev, stt: { ...prev.stt, provider: 'mock' } }))}
-              disabled={isLoadingConfig}
-            >
-              {t('settings.sttProviderMock')}
-            </button>
           </div>
         </div>
 
@@ -154,7 +162,7 @@ export function Settings({
                 }))
               }
               placeholder={t('settings.sttApiKeyPlaceholder')}
-              disabled={isLoadingConfig || config.stt.provider === 'mock'}
+              disabled={isLoadingConfig}
             />
             <button type="button" className="text-button" onClick={() => setShowSttKey((value) => !value)}>
               {showSttKey ? t('settings.hideKey') : t('settings.showKey')}
@@ -169,7 +177,7 @@ export function Settings({
             onChange={(event) =>
               setConfig((prev) => setActiveSttConfig(prev, { ...getActiveSttConfig(prev), model: event.target.value }))
             }
-            disabled={isLoadingConfig || config.stt.provider === 'mock'}
+            disabled={isLoadingConfig}
           />
         </div>
 
@@ -185,7 +193,7 @@ export function Settings({
                 }),
               )
             }
-            disabled={isLoadingConfig || config.stt.provider === 'mock'}
+            disabled={isLoadingConfig}
           >
             <option value="auto">{t('settings.languageAuto')}</option>
             <option value="zh">{t('settings.languageChinese')}</option>
@@ -382,6 +390,25 @@ export function Settings({
     <article className="section-card settings-panel-card">
       <h2>{t('settings.dictionary')}</h2>
       <p className="caption">{t('settings.dictionaryDescription')}</p>
+      <div className="field-stack">
+        <div className="field-group">
+          <label>{t('settings.dictionaryEntries')}</label>
+          <textarea
+            rows={10}
+            value={dictionaryText}
+            onChange={(event) => setDictionaryText(event.target.value)}
+            placeholder={t('settings.dictionaryPlaceholder')}
+            disabled={isLoadingConfig}
+          />
+          <p className="caption">{t('settings.dictionaryFormatHint')}</p>
+        </div>
+        <div className="field-row">
+          <button type="button" className="primary-save" onClick={onSaveDictionary} disabled={isLoadingConfig}>
+            {t('settings.dictionarySave')}
+          </button>
+          {dictionaryStatus && <p className="settings-feedback">{t(dictionaryStatus)}</p>}
+        </div>
+      </div>
     </article>
   )
 

@@ -6,7 +6,7 @@ type HistoryProps = {
   locale: Locale
   history: HistoryItem[]
   copySuccessId: string | null
-  onClearHistory: () => void
+  onClearHistory: () => Promise<void>
   onCopyHistoryText: (id: string, value: string) => Promise<void>
 }
 

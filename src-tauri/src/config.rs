@@ -10,7 +10,28 @@ const DEFAULT_OPENROUTER_STT_MODEL: &str = "openai/whisper-large-v3";
 const DEFAULT_DEEPGRAM_MODEL: &str = "nova-3";
 const DEFAULT_SILICONFLOW_STT_MODEL: &str = "FunAudioLLM/SenseVoiceSmall";
 
-const DEFAULT_LLM_SYSTEM_PROMPT: &str = "You are a dictation assistant. Clean up the following speech-to-text transcription: fix grammar, remove filler words, improve punctuation. Keep the original meaning and language. Return only the polished text, no explanation.";
+const DEFAULT_LLM_SYSTEM_PROMPT: &str = "";
+const DEFAULT_PROMPT_DICTATION: &str = r#"You are a dictation cleanup assistant.
+
+Rules (in priority order):
+1. PUNCTUATION - Add punctuation at speech pauses
+2. CLEANUP - Remove filler words, false starts, repetitions
+3. LISTS - Detect enumeration signals, format as numbered lists
+4. PARAGRAPHS - Separate distinct topics with blank lines
+5. PRESERVE - Keep original language, technical terms, proper nouns
+6. OUTPUT - Return only the cleaned text, no explanation
+
+{dictionary_injection}"#;
+const DEFAULT_PROMPT_ASK_ANYTHING: &str = r#"You are a helpful assistant. Answer the user's question concisely.
+If the user references selected text, apply their instruction to that text.
+Output only the result, no explanation or preamble.
+
+{dictionary_injection}"#;
+const DEFAULT_PROMPT_TRANSLATION: &str = r#"Translate the following text to {target_language}.
+Preserve the original meaning, tone, and formatting.
+Output only the translation, no explanation.
+
+{dictionary_injection}"#;
 const DEFAULT_TARGET_LANG: &str = "English";
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.0-flash";
 
@@ -58,6 +79,8 @@ pub struct AppConfig {
     pub stt: SttConfig,
     #[serde(default)]
     pub llm: LlmConfig,
+    #[serde(default)]
+    pub onboarding_completed: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -94,6 +117,8 @@ pub struct LlmConfig {
     #[serde(default = "default_target_lang")]
     pub target_lang: String,
     #[serde(default)]
+    pub prompts: PromptTemplates,
+    #[serde(default)]
     pub gemini: GeminiConfig,
     #[serde(default)]
     pub openai: OpenAiCompatibleConfig,
@@ -111,6 +136,13 @@ pub struct LlmConfig {
     pub siliconflow: OpenAiCompatibleConfig,
     #[serde(default)]
     pub ollama: OpenAiCompatibleConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PromptTemplates {
+    pub dictation: String,
+    pub ask_anything: String,
+    pub translation: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -189,6 +221,7 @@ impl Default for LlmConfig {
             api_key: String::new(),
             system_prompt: default_llm_system_prompt(),
             target_lang: default_target_lang(),
+            prompts: PromptTemplates::default(),
             gemini: GeminiConfig::default(),
             openai: OpenAiCompatibleConfig::openai_default(),
             openrouter: OpenAiCompatibleConfig::openrouter_default(),
@@ -198,6 +231,16 @@ impl Default for LlmConfig {
             qwen: OpenAiCompatibleConfig::qwen_default(),
             siliconflow: OpenAiCompatibleConfig::siliconflow_default(),
             ollama: OpenAiCompatibleConfig::ollama_default(),
+        }
+    }
+}
+
+impl Default for PromptTemplates {
+    fn default() -> Self {
+        Self {
+            dictation: default_prompt_dictation(),
+            ask_anything: default_prompt_ask_anything(),
+            translation: default_prompt_translation(),
         }
     }
 }
@@ -280,6 +323,18 @@ fn default_llm_system_prompt() -> String {
 
 fn default_target_lang() -> String {
     DEFAULT_TARGET_LANG.to_string()
+}
+
+fn default_prompt_dictation() -> String {
+    DEFAULT_PROMPT_DICTATION.to_string()
+}
+
+fn default_prompt_ask_anything() -> String {
+    DEFAULT_PROMPT_ASK_ANYTHING.to_string()
+}
+
+fn default_prompt_translation() -> String {
+    DEFAULT_PROMPT_TRANSLATION.to_string()
 }
 
 fn default_gemini_model() -> String {
